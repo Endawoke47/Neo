@@ -27,6 +27,10 @@ import documentRoutes from './routes/document.routes';
 import clientRoutes from './routes/client.routes';
 import reportRoutes from './routes/report.routes';
 import aiRoutes from './routes/ai.routes';
+import legalResearchRoutes from './routes/legal-research.routes';
+import { contractIntelligenceRoutes } from './routes/contract-intelligence.routes';
+import legalIntelligenceRoutes from './routes/legal-intelligence.routes';
+import documentAutomationRoutes from './routes/document-automation.routes';
 
 const app = express();
 const PORT = process.env.PORT || 3005;
@@ -82,6 +86,12 @@ app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/clients', clientRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/ai', aiRoutes);
+
+// AI-Powered Legal Services (Phase 2)
+app.use('/api/v1/legal-research', legalResearchRoutes);
+app.use('/api/v1/contract-intelligence', contractIntelligenceRoutes);
+app.use('/api/v1/legal-intelligence', legalIntelligenceRoutes);
+app.use('/api/v1/document-automation', documentAutomationRoutes);
 
 // Error handling middleware
 app.use(notFoundHandler);
