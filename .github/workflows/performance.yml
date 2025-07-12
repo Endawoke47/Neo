@@ -1,0 +1,116 @@
+name: 📊 Performance Monitoring
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'  # Every 6 hours
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  lighthouse-audit:
+    name: 🔍 Lighthouse Performance Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📁 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: 📦 Install Dependencies
+      run: npm ci
+      
+    - name: 🏗️ Build Application
+      run: npm run build
+      
+    - name: 🚀 Start Application
+      run: |
+        npm run dev &
+        sleep 30
+      
+    - name: 🔍 Run Lighthouse CI
+      uses: treosh/lighthouse-ci-action@v10
+      with:
+        configPath: '.lighthouserc.js'
+        temporaryPublicStorage: true
+        
+    - name: 📊 Upload Lighthouse Results
+      uses: actions/upload-artifact@v3
+      with:
+        name: lighthouse-results
+        path: .lighthouseci
+        retention-days: 30
+
+  load-testing:
+    name: 🏋️ Load Testing
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📁 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: 📦 Install Dependencies
+      run: npm ci
+      
+    - name: 🏗️ Build and Start Services
+      run: |
+        npm run build
+        npm run dev &
+        sleep 30
+        
+    - name: 🏋️ Run Load Tests with Artillery
+      run: |
+        npx artillery run tests/load/load-test.yml --output report.json
+        npx artillery report report.json --output report.html
+        
+    - name: 📊 Upload Load Test Results
+      uses: actions/upload-artifact@v3
+      with:
+        name: load-test-results
+        path: |
+          report.json
+          report.html
+        retention-days: 30
+
+  api-performance:
+    name: 🚀 API Performance Testing
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📁 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: 📦 Install Dependencies
+      run: npm ci
+      
+    - name: 🏗️ Build and Start API
+      run: |
+        npm run build:api
+        npm run dev &
+        sleep 30
+        
+    - name: 🚀 Run API Performance Tests
+      run: |
+        npx autocannon http://localhost:8000/health -c 100 -d 60 --json > api-perf-report.json
+        
+    - name: 📊 Upload API Performance Results
+      uses: actions/upload-artifact@v3
+      with:
+        name: api-performance-results
+        path: api-perf-report.json
+        retention-days: 30

@@ -1,0 +1,109 @@
+version: '3.8'
+
+services:
+  counselflow-api:
+    build: 
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: counselflow-api-staging
+    environment:
+      - NODE_ENV=staging
+      - PORT=8000
+      - DATABASE_URL=postgresql://counselflow:password@db:5432/counselflow_staging
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    networks:
+      - counselflow-network
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api-staging.rule=Host(`api-staging.counselflow.com`)"
+      - "traefik.http.routers.api-staging.tls=true"
+      - "traefik.http.routers.api-staging.tls.certresolver=letsencrypt"
+
+  counselflow-web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: counselflow-web-staging
+    environment:
+      - NODE_ENV=staging
+      - NEXT_PUBLIC_API_URL=https://api-staging.counselflow.com
+    ports:
+      - "3000:3000"
+    depends_on:
+      - counselflow-api
+    networks:
+      - counselflow-network
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.web-staging.rule=Host(`staging.counselflow.com`)"
+      - "traefik.http.routers.web-staging.tls=true"
+      - "traefik.http.routers.web-staging.tls.certresolver=letsencrypt"
+
+  db:
+    image: postgres:15-alpine
+    container_name: counselflow-db-staging
+    environment:
+      - POSTGRES_DB=counselflow_staging
+      - POSTGRES_USER=counselflow
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data_staging:/var/lib/postgresql/data
+      - ./apps/api/prisma/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - counselflow-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: counselflow-redis-staging
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data_staging:/data
+    networks:
+      - counselflow-network
+    restart: unless-stopped
+
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik-staging
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=admin@counselflow.com"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_letsencrypt:/letsencrypt
+    networks:
+      - counselflow-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data_staging:
+  redis_data_staging:
+  traefik_letsencrypt:
+
+networks:
+  counselflow-network:
+    driver: bridge

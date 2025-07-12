@@ -1,0 +1,124 @@
+name: 🚀 Continuous Deployment
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+
+jobs:
+  deploy-staging:
+    name: 🧪 Deploy to Staging
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: staging
+    
+    steps:
+    - name: 📁 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: 📦 Install Dependencies
+      run: npm ci
+      
+    - name: 🏗️ Build Projects
+      run: npm run build
+      env:
+        NODE_ENV: staging
+        
+    - name: 🐳 Build Docker Images
+      run: |
+        docker build -t counselflow-api:staging ./apps/api
+        docker build -t counselflow-web:staging ./apps/web
+        
+    - name: 🏷️ Tag Images
+      run: |
+        docker tag counselflow-api:staging ${{ secrets.DOCKER_REGISTRY }}/counselflow-api:staging
+        docker tag counselflow-web:staging ${{ secrets.DOCKER_REGISTRY }}/counselflow-web:staging
+        
+    - name: 📤 Push to Registry
+      run: |
+        echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin ${{ secrets.DOCKER_REGISTRY }}
+        docker push ${{ secrets.DOCKER_REGISTRY }}/counselflow-api:staging
+        docker push ${{ secrets.DOCKER_REGISTRY }}/counselflow-web:staging
+        
+    - name: 🚀 Deploy to Staging
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.STAGING_HOST }}
+        username: ${{ secrets.STAGING_USER }}
+        key: ${{ secrets.STAGING_SSH_KEY }}
+        script: |
+          cd /opt/counselflow
+          docker-compose -f docker-compose.staging.yml pull
+          docker-compose -f docker-compose.staging.yml up -d
+          docker system prune -f
+
+  deploy-production:
+    name: 🏭 Deploy to Production
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    needs: [deploy-staging]
+    
+    steps:
+    - name: 📁 Checkout Repository
+      uses: actions/checkout@v4
+      
+    - name: 🔧 Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+        cache: 'npm'
+        
+    - name: 📦 Install Dependencies
+      run: npm ci
+      
+    - name: 🏗️ Build Projects
+      run: npm run build
+      env:
+        NODE_ENV: production
+        
+    - name: 🐳 Build Docker Images
+      run: |
+        docker build -t counselflow-api:${{ github.ref_name }} ./apps/api
+        docker build -t counselflow-web:${{ github.ref_name }} ./apps/web
+        
+    - name: 🏷️ Tag Images
+      run: |
+        docker tag counselflow-api:${{ github.ref_name }} ${{ secrets.DOCKER_REGISTRY }}/counselflow-api:${{ github.ref_name }}
+        docker tag counselflow-api:${{ github.ref_name }} ${{ secrets.DOCKER_REGISTRY }}/counselflow-api:latest
+        docker tag counselflow-web:${{ github.ref_name }} ${{ secrets.DOCKER_REGISTRY }}/counselflow-web:${{ github.ref_name }}
+        docker tag counselflow-web:${{ github.ref_name }} ${{ secrets.DOCKER_REGISTRY }}/counselflow-web:latest
+        
+    - name: 📤 Push to Registry
+      run: |
+        echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin ${{ secrets.DOCKER_REGISTRY }}
+        docker push ${{ secrets.DOCKER_REGISTRY }}/counselflow-api:${{ github.ref_name }}
+        docker push ${{ secrets.DOCKER_REGISTRY }}/counselflow-api:latest
+        docker push ${{ secrets.DOCKER_REGISTRY }}/counselflow-web:${{ github.ref_name }}
+        docker push ${{ secrets.DOCKER_REGISTRY }}/counselflow-web:latest
+        
+    - name: 🚀 Deploy to Production
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.PRODUCTION_HOST }}
+        username: ${{ secrets.PRODUCTION_USER }}
+        key: ${{ secrets.PRODUCTION_SSH_KEY }}
+        script: |
+          cd /opt/counselflow
+          docker-compose -f docker-compose.prod.yml pull
+          docker-compose -f docker-compose.prod.yml up -d
+          docker system prune -f
+          
+    - name: 📧 Notify Deployment
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+      if: always()

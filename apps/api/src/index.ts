@@ -7,12 +7,18 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
+
+// Load environment variables FIRST
+dotenv.config();
+
+import swaggerUi from 'swagger-ui-express';
 import { logger } from './config/logger';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { requestLogger } from './middleware/logger.middleware';
+import { swaggerSpec } from './config/swagger';
 
 // Routes
-import authRoutes from './routes/auth.routes';
+import authRoutes from './routes/auth-secure.routes';
 import userRoutes from './routes/user.routes';
 import contractRoutes from './routes/contract.routes';
 import matterRoutes from './routes/matter.routes';
@@ -22,11 +28,8 @@ import clientRoutes from './routes/client.routes';
 import reportRoutes from './routes/report.routes';
 import aiRoutes from './routes/ai.routes';
 
-// Load environment variables
-dotenv.config();
-
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3005;
 
 // Rate limiting
 const limiter = rateLimit({
@@ -49,6 +52,15 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Logging middleware
 app.use(requestLogger);
+
+// Swagger UI setup
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// OpenAPI JSON specification endpoint
+app.get('/api-docs.json', (_, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
 
 // Health check endpoint
 app.get('/health', (_, res) => {
