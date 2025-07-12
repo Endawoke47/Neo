@@ -63,7 +63,7 @@ const generateTokens = (user: any) => {
       expiresIn: JWT_EXPIRES_IN,
       issuer: 'CounselFlow',
       audience: process.env.APP_URL || 'http://localhost:3000'
-    }
+    } as jwt.SignOptions
   );
 
   const refreshToken = jwt.sign(
@@ -73,7 +73,7 @@ const generateTokens = (user: any) => {
       expiresIn: JWT_REFRESH_EXPIRES_IN,
       issuer: 'CounselFlow',
       audience: process.env.APP_URL || 'http://localhost:3000'
-    }
+    } as jwt.SignOptions
   );
 
   return { accessToken, refreshToken };
@@ -113,26 +113,46 @@ const recordSuccessfulLogin = (identifier: string): void => {
   loginAttempts.delete(identifier);
 };
 
+// Hash password
+const hashPassword = async (password: string): Promise<string> => {
+  return await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
+};
+
+// Compare password
+const comparePassword = async (password: string, hash: string): Promise<boolean> => {
+  return await bcrypt.compare(password, hash);
+};
+
+// Demo user for development (remove in production)
+const isDevelopment = process.env.NODE_ENV !== 'production';
+const DEMO_USER = isDevelopment ? {
+  id: 'demo-user-id',
+  email: 'demo@counselflow.com',
+  firstName: 'Demo',
+  lastName: 'User',
+  role: 'ADMIN',
+  status: 'ACTIVE',
+  passwordHash: '$2b$12$demo.hash.for.development.only', // This would be a real hash in development
+} : null;
+
 // Login endpoint
 router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password } = req.body;
+    const validatedData = LoginSchema.parse(req.body);
+    const { email, password, rememberMe } = validatedData;
 
-    if (!email || !password) {
-      return res.status(400).json({
+    // Check rate limiting
+    if (!checkRateLimit(email)) {
+      return res.status(429).json({
         success: false,
-        message: 'Email and password are required'
+        message: 'Too many login attempts. Account temporarily locked.',
       });
     }
 
-    // Demo authentication
-    if (email === 'endawoke47@counselflow.com' && password === 'demo') {
-      const token = generateToken(DEMO_USER);
-      const refreshToken = jwt.sign(
-        { id: DEMO_USER.id },
-        process.env.JWT_SECRET || 'your-secret-key',
-        { expiresIn: '7d' }
-      );
+    // Development-only demo authentication
+    if (isDevelopment && DEMO_USER && email === DEMO_USER.email && password === 'demo') {
+      const tokens = generateTokens(DEMO_USER);
+      recordSuccessfulLogin(email);
 
       logger.info('Demo user login successful', { email });
 
@@ -146,17 +166,35 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
           role: DEMO_USER.role,
           status: DEMO_USER.status,
         },
-        token,
-        refreshToken,
+        token: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresIn: 24 * 60 * 60, // 24 hours in seconds
       });
     }
 
-    // TODO: Implement actual user authentication with database
+    // TODO: Implement database user lookup and password verification
+    // const user = await getUserByEmail(email);
+    // if (!user || !await comparePassword(password, user.passwordHash)) {
+    //   recordFailedAttempt(email);
+    //   return res.status(401).json({
+    //     success: false,
+    //     message: 'Invalid email or password'
+    //   });
+    // }
+
+    recordFailedAttempt(email);
     return res.status(401).json({
       success: false,
       message: 'Invalid email or password'
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: error.flatten().fieldErrors,
+      });
+    }
     next(error);
   }
 });
@@ -164,21 +202,40 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
 // Register endpoint
 router.post('/register', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { email, password, firstName, lastName } = req.body;
+    const validatedData = RegisterSchema.parse(req.body);
+    const { email, password, firstName, lastName } = validatedData;
 
-    if (!email || !password || !firstName || !lastName) {
-      return res.status(400).json({
+    // Check if registration is enabled
+    if (!process.env.ENABLE_REGISTRATION || process.env.ENABLE_REGISTRATION === 'false') {
+      return res.status(403).json({
         success: false,
-        message: 'All fields are required'
+        message: 'Registration is currently disabled'
       });
     }
 
-    // TODO: Implement user registration with database
+    // Hash password
+    const passwordHash = await hashPassword(password);
+
+    // TODO: Implement user creation in database
+    // const user = await createUser({
+    //   email,
+    //   passwordHash,
+    //   firstName,
+    //   lastName,
+    // });
+
     return res.status(501).json({
       success: false,
       message: 'Registration not implemented yet'
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: error.flatten().fieldErrors,
+      });
+    }
     next(error);
   }
 });
@@ -187,7 +244,7 @@ router.post('/register', async (req: Request, res: Response, next: NextFunction)
 router.get('/me', authenticate, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     // For demo purposes, return the demo user
-    if (req.user?.id === 'demo-user-id') {
+    if (isDevelopment && DEMO_USER && req.user?.id === 'demo-user-id') {
       return res.json({
         success: true,
         user: {
@@ -202,6 +259,14 @@ router.get('/me', authenticate, async (req: AuthenticatedRequest, res: Response,
     }
 
     // TODO: Fetch user from database
+    // const user = await getUserById(req.user?.id);
+    // if (!user) {
+    //   return res.status(404).json({
+    //     success: false,
+    //     message: 'User not found'
+    //   });
+    // }
+
     return res.status(404).json({
       success: false,
       message: 'User not found'
@@ -223,24 +288,39 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       });
     }
 
-    const secret = process.env.JWT_SECRET || 'your-secret-key';
-    const decoded = jwt.verify(refreshToken, secret) as any;
+    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET, {
+      issuer: 'CounselFlow',
+      audience: process.env.APP_URL || 'http://localhost:3000'
+    }) as any;
 
     // For demo purposes
-    if (decoded.id === 'demo-user-id') {
-      const newToken = generateToken(DEMO_USER);
+    if (isDevelopment && DEMO_USER && decoded.id === 'demo-user-id') {
+      const tokens = generateTokens(DEMO_USER);
       return res.json({
         success: true,
-        token: newToken,
+        token: tokens.accessToken,
+        expiresIn: 24 * 60 * 60, // 24 hours in seconds
       });
     }
+
+    // TODO: Verify user exists in database
+    // const user = await getUserById(decoded.id);
+    // if (!user) {
+    //   return res.status(401).json({
+    //     success: false,
+    //     message: 'Invalid refresh token'
+    //   });
+    // }
 
     return res.status(401).json({
       success: false,
       message: 'Invalid refresh token'
     });
   } catch (error) {
-    next(error);
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid refresh token'
+    });
   }
 });
 
@@ -276,7 +356,7 @@ router.post('/forgot-password', async (req: Request, res: Response, next: NextFu
 
     return res.json({
       success: true,
-      message: 'Password reset email sent',
+      message: 'If an account with that email exists, a password reset link has been sent.',
     });
   } catch (error) {
     next(error);
