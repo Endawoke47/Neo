@@ -10,12 +10,17 @@ import {
   LegalSystem 
 } from '../types/ai.types';
 import { authenticate, AuthenticatedRequest } from '../middleware/auth.middleware';
+// Phase 2 Feature 1: Legal Research Engine
+import legalResearchRoutes from './legal-research.routes';
 
 const router = Router();
 const aiGateway = new AIGatewayService();
 
 // Apply authentication to all AI routes
 router.use(authenticate);
+
+// Phase 2: Mount Legal Research routes at /legal
+router.use('/legal', legalResearchRoutes);
 
 // Main AI Analysis Endpoint
 router.post('/analyze', async (req: AuthenticatedRequest, res) => {

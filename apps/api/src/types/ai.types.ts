@@ -44,7 +44,10 @@ export enum LegalJurisdiction {
   BAHRAIN = 'BH', CYPRUS = 'CY', IRAN = 'IR', IRAQ = 'IQ', ISRAEL = 'IL',
   JORDAN = 'JO', KUWAIT = 'KW', LEBANON = 'LB', OMAN = 'OM', PALESTINE = 'PS',
   QATAR = 'QA', SAUDI_ARABIA = 'SA', SYRIA = 'SY', TURKEY = 'TR', 
-  UAE = 'AE', YEMEN = 'YE'
+  UAE = 'AE', YEMEN = 'YE',
+  
+  // International/Cross-border
+  INTERNATIONAL = 'INTL'
 }
 
 // Legal System Types
