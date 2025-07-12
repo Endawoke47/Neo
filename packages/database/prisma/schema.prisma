@@ -1,0 +1,92 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  role      String   @default("CLIENT") // "ADMIN", "COUNSELOR", "CLIENT"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  client       Client?
+  appointments Appointment[] @relation("CounselorAppointments")
+  sessions     Session[]     @relation("CounselorSessions")
+
+  @@map("users")
+}
+
+model Client {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  firstName        String
+  lastName         String
+  email            String
+  phone            String?
+  address          String?
+  dateOfBirth      DateTime?
+  emergencyContact String?
+  emergencyPhone   String?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  appointments Appointment[]
+  sessions     Session[]
+
+  @@map("clients")
+}
+
+model Appointment {
+  id          String   @id @default(cuid())
+  clientId    String
+  counselorId String
+  scheduledAt DateTime
+  duration    Int // in minutes
+  status      String   @default("SCHEDULED") // "SCHEDULED", "COMPLETED", "CANCELLED", "NO_SHOW"
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  counselor User      @relation("CounselorAppointments", fields: [counselorId], references: [id])
+  session   Session?
+
+  @@map("appointments")
+}
+
+model Session {
+  id            String   @id @default(cuid())
+  appointmentId String   @unique
+  clientId      String
+  counselorId   String
+  date          DateTime
+  duration      Int
+  notes         String
+  progress      String
+  nextSteps     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  client      Client      @relation(fields: [clientId], references: [id])
+  counselor   User        @relation("CounselorSessions", fields: [counselorId], references: [id])
+
+  @@map("sessions")
+}
+
+

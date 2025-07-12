@@ -1,0 +1,39 @@
+{
+  "name": "counselflow-ultimate",
+  "version": "1.0.0",
+  "description": "AI-Powered Legal Practice Management System",
+  "author": "Endawoke47",
+  "license": "PROPRIETARY",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"yarn workspace @counselflow/web dev\" \"yarn workspace @counselflow/api dev\"",
+    "build": "yarn workspaces run build",
+    "test": "yarn workspaces run test",
+    "lint": "yarn workspaces run lint",
+    "clean": "yarn workspaces run clean",
+    "deploy": "docker-compose up -d",
+    "typecheck": "turbo run type-check",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "prisma:generate": "yarn workspace @counselflow/api prisma:generate",
+    "prisma:migrate": "yarn workspace @counselflow/api prisma:migrate",
+    "prisma:studio": "yarn workspace @counselflow/api prisma:studio",
+    "prisma:seed": "yarn workspace @counselflow/api prisma:seed"
+  },
+  "devDependencies": {
+    "@turbo/gen": "^1.10.12",
+    "@types/eslint": "^8.56.2",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.4",
+    "turbo": "^1.10.12",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "yarn": ">=1.22.0"
+  }
+}
