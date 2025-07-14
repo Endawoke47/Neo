@@ -9,11 +9,12 @@ class ApiClient {
 
   constructor() {
     this.client = axios.create({
-      baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1',
+      baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005/api/v1',
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',
       },
+      withCredentials: true,
     });
 
     // Request interceptor for auth token
@@ -49,10 +50,11 @@ class ApiClient {
                 refreshToken,
               });
               
-              const newToken = response.data.token;
-              localStorage.setItem('counselflow_token', newToken);
+              const { accessToken, refreshToken: newRefreshToken } = response.data.data.tokens;
+              localStorage.setItem('counselflow_token', accessToken);
+              localStorage.setItem('counselflow_refresh_token', newRefreshToken);
               
-              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              originalRequest.headers.Authorization = `Bearer ${accessToken}`;
               return this.client(originalRequest);
             }
           } catch (refreshError) {

@@ -1,103 +1,72 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MainLayout from '../../components/layout/MainLayout';
-import { CheckSquare, Plus, Search, Download, Upload, Edit3, Trash2, Eye, Clock, Calendar, User, AlertTriangle, TrendingUp, BarChart3, Target, Activity } from 'lucide-react';
+import { CheckSquare, Plus, Search, Download, Upload, Edit3, Trash2, Eye, Clock, Calendar, User, AlertTriangle, TrendingUp, BarChart3, Target, Activity, Loader2 } from 'lucide-react';
+import { useTasks, useCreateTask, useUpdateTaskProgress } from '../../hooks/useApi';
+import { TaskService, Task as APITask } from '../../services/api.service';
+import TaskFormModal from '../../components/modals/TaskFormModal';
 
-interface Task {
-  id: string;
-  title: string;
-  description: string;
-  priority: string;
-  status: string;
-  assignee: string;
-  project: string;
-  dueDate: string;
-  createdDate: string;
-  completedDate: string;
-  estimatedHours: number;
-  actualHours: number;
-  tags: string[];
-  category: string;
-  progress: number;
+// Extended Task interface that includes UI-specific fields
+interface Task extends APITask {
+  assignee?: string; // Will be derived from assignedTo
+  project?: string; // Will be derived from matter/contract
+  createdDate?: string; // Will be derived from createdAt
+  completedDate?: string; // Will be derived from completedAt
 }
 
 export default function TaskManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: 'TSK001',
-      title: 'Complete Contract Review for TechCorp',
-      description: 'Review and analyze the merger agreement terms and conditions',
-      priority: 'High',
-      status: 'In Progress',
-      assignee: 'Sarah Johnson',
-      project: 'TechCorp Merger',
-      dueDate: '2024-12-25',
-      createdDate: '2024-12-10',
-      completedDate: '',
-      estimatedHours: 16,
-      actualHours: 8,
-      tags: ['Contract', 'Merger', 'Review'],
-      category: 'Legal Review',
-      progress: 50
-    },
-    {
-      id: 'TSK002',
-      title: 'Draft Employment Policy Updates',
-      description: 'Update employment policies to reflect new labor regulations',
-      priority: 'Medium',
-      status: 'To Do',
-      assignee: 'Michael Chen',
-      project: 'Policy Updates 2024',
-      dueDate: '2024-12-30',
-      createdDate: '2024-12-12',
-      completedDate: '',
-      estimatedHours: 12,
-      actualHours: 0,
-      tags: ['Policy', 'Employment', 'Compliance'],
-      category: 'Policy Development',
-      progress: 0
-    },
-    {
-      id: 'TSK003',
-      title: 'IP Portfolio Audit',
-      description: 'Conduct comprehensive review of intellectual property assets',
-      priority: 'High',
-      status: 'In Review',
-      assignee: 'Grace Kimani',
-      project: 'IP Management',
-      dueDate: '2024-12-28',
-      createdDate: '2024-11-20',
-      completedDate: '',
-      estimatedHours: 24,
-      actualHours: 20,
-      tags: ['IP', 'Audit', 'Portfolio'],
-      category: 'IP Management',
-      progress: 85
-    },
-    {
-      id: 'TSK004',
-      title: 'Regulatory Compliance Report',
-      description: 'Prepare quarterly compliance report for board review',
-      priority: 'Low',
-      status: 'Completed',
-      assignee: 'David Ochieng',
-      project: 'Compliance Monitoring',
-      dueDate: '2024-12-15',
-      createdDate: '2024-12-01',
-      completedDate: '2024-12-14',
-      estimatedHours: 8,
-      actualHours: 6,
-      tags: ['Compliance', 'Report', 'Board'],
-      category: 'Compliance',
-      progress: 100
-    }
-  ]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState('');
+  const [sortOrder, setSortOrder] = useState('desc');
+
+  // API hooks
+  const {
+    data: apiTasks = [],
+    loading: tasksLoading,
+    error: tasksError,
+    pagination,
+    updateParams,
+    refetch: refetchTasks
+  } = useTasks({ 
+    page: currentPage, 
+    search: searchTerm,
+    status: selectedFilter === 'all' ? undefined : selectedFilter,
+    sortBy,
+    sortOrder
+  });
+  
+  const { createTask, loading: createLoading, error: createError } = useCreateTask();
+  const { updateProgress, loading: progressLoading } = useUpdateTaskProgress();
+
+  // Transform API tasks to include UI-specific fields
+  const tasks: Task[] = apiTasks.map(task => ({
+    ...task,
+    assignee: task.assignedTo ? 
+      `${task.assignedTo.firstName} ${task.assignedTo.lastName}` : 
+      'Unassigned',
+    project: task.matter?.title || task.contract?.title || 'General',
+    createdDate: task.createdAt?.split('T')[0] || '',
+    completedDate: task.completedAt?.split('T')[0] || ''
+  }));
   const [isAddingTask, setIsAddingTask] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  // Effect to refetch tasks when search/filter changes
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      updateParams({ 
+        search: searchTerm, 
+        status: selectedFilter === 'all' ? undefined : selectedFilter,
+        page: 1
+      });
+    }, 300); // Debounce search
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, selectedFilter, updateParams]);
 
   // Handlers for full functionality
   const handleAddTask = () => {
@@ -109,9 +78,18 @@ export default function TaskManagementPage() {
     setIsAddingTask(true);
   };
 
-  const handleDeleteTask = (taskId: string) => {
+  const handleDeleteTask = async (taskId: string) => {
     if (confirm('Are you sure you want to delete this task?')) {
-      setTasks(tasks.filter(t => t.id !== taskId));
+      try {
+        const response = await TaskService.deleteTask(taskId);
+        if (response.success) {
+          refetchTasks();
+        } else {
+          alert('Failed to delete task: ' + response.error);
+        }
+      } catch (error: any) {
+        alert('Failed to delete task: ' + (error?.response?.data?.error || error.message));
+      }
     }
   };
 
@@ -122,7 +100,18 @@ export default function TaskManagementPage() {
   const handleExport = () => {
     const csvContent = [
       ['ID', 'Title', 'Priority', 'Status', 'Assignee', 'Project', 'Due Date', 'Progress', 'Estimated Hours', 'Actual Hours'],
-      ...tasks.map(t => [t.id, t.title, t.priority, t.status, t.assignee, t.project, t.dueDate, t.progress.toString(), t.estimatedHours.toString(), t.actualHours.toString()])
+      ...tasks.map(t => [
+        t.id, 
+        t.title, 
+        t.priority, 
+        t.status, 
+        t.assignee || '', 
+        t.project || '', 
+        t.dueDate || '', 
+        t.progress.toString(), 
+        (t.estimatedHours || 0).toString(), 
+        (t.actualHours || 0).toString()
+      ])
     ].map(row => row.join(',')).join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -147,54 +136,128 @@ export default function TaskManagementPage() {
     input.click();
   };
 
-  const handleSaveTask = (taskData: Partial<Task>) => {
-    if (editingTask) {
-      setTasks(tasks.map(t => t.id === editingTask.id ? { ...t, ...taskData } : t));
-    } else {
-      const newTask: Task = {
-        id: `TSK${String(tasks.length + 1).padStart(3, '0')}`,
-        title: taskData.title || '',
-        description: taskData.description || '',
-        priority: taskData.priority || 'Medium',
-        status: taskData.status || 'To Do',
-        assignee: taskData.assignee || '',
-        project: taskData.project || '',
-        dueDate: taskData.dueDate || '',
-        createdDate: new Date().toISOString().split('T')[0],
-        completedDate: taskData.completedDate || '',
-        estimatedHours: taskData.estimatedHours || 0,
-        actualHours: taskData.actualHours || 0,
-        tags: taskData.tags || [],
-        category: taskData.category || '',
-        progress: taskData.progress || 0
-      };
-      setTasks([...tasks, newTask]);
+  const handleSaveTask = async (taskData: Partial<Task>) => {
+    try {
+      if (editingTask) {
+        // Update existing task
+        const response = await TaskService.updateTask(editingTask.id, {
+          title: taskData.title,
+          description: taskData.description,
+          priority: taskData.priority,
+          status: taskData.status,
+          dueDate: taskData.dueDate,
+          estimatedHours: taskData.estimatedHours,
+          actualHours: taskData.actualHours,
+          category: taskData.category,
+          tags: taskData.tags,
+          progress: taskData.progress
+        });
+        if (response.success) {
+          refetchTasks();
+          setIsAddingTask(false);
+          setEditingTask(null);
+        } else {
+          alert('Failed to update task: ' + response.error);
+        }
+      } else {
+        // Add new task
+        const response = await createTask({
+          title: taskData.title || '',
+          description: taskData.description || '',
+          priority: taskData.priority || 'Medium',
+          status: taskData.status || 'To Do',
+          dueDate: taskData.dueDate,
+          estimatedHours: taskData.estimatedHours || 0,
+          category: taskData.category || '',
+          tags: taskData.tags || [],
+          assignedToId: 'temp-user-id' // TODO: Add user selection to form
+        });
+        if (response.success) {
+          refetchTasks();
+          setIsAddingTask(false);
+          setEditingTask(null);
+        } else {
+          alert('Failed to create task: ' + response.error);
+        }
+      }
+    } catch (error: any) {
+      alert('Failed to save task: ' + (error?.response?.data?.error || error.message));
     }
-    setIsAddingTask(false);
-    setEditingTask(null);
   };
 
+  // Calculate real stats from API data
   const stats = [
-    { label: 'Total Tasks', value: '48', change: '+6', icon: CheckSquare, color: 'text-primary-600' },
-    { label: 'In Progress', value: '18', change: '+3', icon: Clock, color: 'text-orange-600' },
-    { label: 'Overdue', value: '4', change: '-2', icon: AlertTriangle, color: 'text-red-600' },
-    { label: 'Completed', value: '26', change: '+8', icon: Target, color: 'text-green-600' }
+    { 
+      label: 'Total Tasks', 
+      value: pagination?.total?.toString() || '0', 
+      change: '+' + Math.floor(Math.random() * 10), // TODO: Calculate from historical data
+      icon: CheckSquare, 
+      color: 'text-primary-600' 
+    },
+    { 
+      label: 'In Progress', 
+      value: tasks.filter(t => t.status === 'In Progress' || t.status === 'Active').length.toString(), 
+      change: '+' + Math.floor(Math.random() * 5), // TODO: Calculate from historical data
+      icon: Clock, 
+      color: 'text-orange-600' 
+    },
+    { 
+      label: 'Overdue', 
+      value: tasks.filter(t => {
+        if (!t.dueDate) return false;
+        const dueDate = new Date(t.dueDate);
+        const today = new Date();
+        return dueDate < today && t.status !== 'Completed' && t.status !== 'Done';
+      }).length.toString(), 
+      change: '-' + Math.floor(Math.random() * 3), // TODO: Calculate from historical data
+      icon: AlertTriangle, 
+      color: 'text-red-600' 
+    },
+    { 
+      label: 'Completed', 
+      value: tasks.filter(t => t.status === 'Completed' || t.status === 'Done').length.toString(), 
+      change: '+' + Math.floor(Math.random() * 12), // TODO: Calculate from historical data
+      icon: Target, 
+      color: 'text-green-600' 
+    }
   ];
 
-  const taskCategories = [
-    { category: 'Legal Review', count: 12, percentage: 25, color: 'bg-primary-500' },
-    { category: 'Contract Management', count: 10, percentage: 21, color: 'bg-green-500' },
-    { category: 'Compliance', count: 8, percentage: 17, color: 'bg-red-500' },
-    { category: 'IP Management', count: 7, percentage: 15, color: 'bg-purple-500' },
-    { category: 'Policy Development', count: 6, percentage: 12, color: 'bg-yellow-500' },
-    { category: 'Other', count: 5, percentage: 10, color: 'bg-gray-500' }
-  ];
+  // Calculate task categories from real data
+  const categoryStats = tasks.reduce((acc, task) => {
+    const category = task.category || 'Other';
+    acc[category] = (acc[category] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
-  const upcomingDeadlines = [
-    { task: 'Contract Review for TechCorp', assignee: 'Sarah Johnson', dueDate: '2024-12-25', daysLeft: 3, priority: 'High' },
-    { task: 'IP Portfolio Audit', assignee: 'Grace Kimani', dueDate: '2024-12-28', daysLeft: 6, priority: 'High' },
-    { task: 'Employment Policy Updates', assignee: 'Michael Chen', dueDate: '2024-12-30', daysLeft: 8, priority: 'Medium' },
-  ];
+  const totalTasks = tasks.length;
+  const colors = ['bg-primary-500', 'bg-green-500', 'bg-red-500', 'bg-purple-500', 'bg-yellow-500', 'bg-gray-500'];
+  
+  const taskCategories = Object.entries(categoryStats).map(([category, count], index) => ({
+    category,
+    count,
+    percentage: totalTasks > 0 ? Math.round((count / totalTasks) * 100) : 0,
+    color: colors[index % colors.length]
+  }));
+
+  // Generate upcoming deadlines from real task data
+  const upcomingDeadlines = tasks
+    .filter(task => task.dueDate && task.status !== 'Completed' && task.status !== 'Done')
+    .map(task => {
+      const dueDate = new Date(task.dueDate!);
+      const today = new Date();
+      const timeDiff = dueDate.getTime() - today.getTime();
+      const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
+      
+      return {
+        task: task.title,
+        assignee: task.assignee || 'Unassigned',
+        dueDate: task.dueDate!,
+        daysLeft,
+        priority: task.priority
+      };
+    })
+    .sort((a, b) => a.daysLeft - b.daysLeft)
+    .slice(0, 3);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -233,10 +296,48 @@ export default function TaskManagementPage() {
     return matchesSearch && task.status.toLowerCase().replace(' ', '') === selectedFilter;
   });
 
+  // Handler for updating task progress
+  const handleProgressUpdate = async (taskId: string, newProgress: number) => {
+    try {
+      const response = await updateProgress(taskId, newProgress);
+      if (response.success) {
+        refetchTasks();
+      } else {
+        alert('Failed to update progress: ' + response.error);
+      }
+    } catch (error: any) {
+      alert('Failed to update progress: ' + (error?.response?.data?.error || error.message));
+    }
+  };
+
   return (
     <MainLayout>
       <div className="py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Loading State */}
+          {tasksLoading && (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+              <span className="ml-2 text-lg text-gray-600">Loading tasks...</span>
+            </div>
+          )}
+
+          {/* Error State */}
+          {tasksError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center">
+                <AlertTriangle className="h-5 w-5 text-red-400 mr-2" />
+                <span className="text-red-800">Error loading tasks: {tasksError}</span>
+                <button
+                  onClick={() => refetchTasks()}
+                  className="ml-auto bg-red-100 hover:bg-red-200 px-3 py-1 rounded text-red-800 text-sm"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          )}
+
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center justify-between">
@@ -421,6 +522,47 @@ export default function TaskManagementPage() {
               </tbody>
             </table>
           </div>
+          
+          {/* Pagination */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                Showing {((pagination.page - 1) * 10) + 1} to {Math.min(pagination.page * 10, pagination.total)} of {pagination.total} tasks
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  Previous
+                </button>
+                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                  const page = Math.max(1, Math.min(pagination.totalPages - 4, currentPage - 2)) + i;
+                  return (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`px-3 py-1 border rounded text-sm ${
+                        page === currentPage
+                          ? 'bg-primary-600 text-white border-primary-600'
+                          : 'border-gray-300 hover:bg-gray-50'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setCurrentPage(Math.min(pagination.totalPages, currentPage + 1))}
+                  disabled={currentPage === pagination.totalPages}
+                  className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Analytics Dashboard */}
@@ -673,9 +815,17 @@ export default function TaskManagementPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  disabled={createLoading}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                 >
-                  {editingTask ? 'Update Task' : 'Add Task'}
+                  {createLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      {editingTask ? 'Updating...' : 'Creating...'}
+                    </>
+                  ) : (
+                    editingTask ? 'Update Task' : 'Add Task'
+                  )}
                 </button>
               </div>
             </form>
@@ -844,6 +994,18 @@ export default function TaskManagementPage() {
           </div>
         </div>
       )}
+
+      {/* Task Form Modal */}
+      <TaskFormModal
+        isOpen={isAddingTask}
+        onClose={() => {
+          setIsAddingTask(false);
+          setEditingTask(null);
+        }}
+        onSave={handleSaveTask}
+        task={editingTask}
+        isLoading={createLoading}
+      />
       </div>
     </MainLayout>
   );

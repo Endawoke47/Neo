@@ -15,16 +15,28 @@ import swaggerUi from 'swagger-ui-express';
 import { logger } from './config/logger';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware';
 import { requestLogger } from './middleware/logger.middleware';
+import { auditLogger } from './middleware/audit.middleware';
 import { swaggerSpec } from './config/swagger';
 
+// Import middleware
+import { 
+  securityHeaders, 
+  corsOptions, 
+  generalLimiter, 
+  sanitizeInput, 
+  additionalSecurityHeaders,
+  addRequestId
+} from './middleware/security.middleware';
+
 // Routes
-import authRoutes from './routes/auth-secure.routes';
+import authRoutes from './routes/auth.routes';
 import userRoutes from './routes/user.routes';
 import contractRoutes from './routes/contract.routes';
 import matterRoutes from './routes/matter.routes';
 import disputeRoutes from './routes/dispute.routes';
 import documentRoutes from './routes/document.routes';
 import clientRoutes from './routes/client.routes';
+import dashboardRoutes from './routes/dashboard.routes';
 import reportRoutes from './routes/report.routes';
 import aiRoutes from './routes/ai.routes';
 import legalResearchRoutes from './routes/legal-research.routes';
@@ -35,27 +47,21 @@ import documentAutomationRoutes from './routes/document-automation.routes';
 const app = express();
 const PORT = process.env.PORT || 3005;
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-});
-
-// Security middleware
-app.use(helmet());
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true,
-}));
-app.use(limiter);
+// Security middleware with enhanced configuration
+app.use(addRequestId);
+app.use(securityHeaders);
+app.use(cors(corsOptions));
+app.use(generalLimiter);
+app.use(sanitizeInput);
+app.use(additionalSecurityHeaders);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Logging middleware
+// Logging and audit middleware
 app.use(requestLogger);
+app.use(auditLogger());
 
 // Swagger UI setup
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -84,6 +90,7 @@ app.use('/api/v1/matters', matterRoutes);
 app.use('/api/v1/disputes', disputeRoutes);
 app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/clients', clientRoutes);
+app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/reports', reportRoutes);
 app.use('/api/v1/ai', aiRoutes);
 

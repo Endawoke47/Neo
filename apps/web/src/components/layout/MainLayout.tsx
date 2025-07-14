@@ -9,6 +9,7 @@ import {
   FileText,
   Scale,
   Building2,
+  Users,
   BookOpen,
   Shield,
   ScrollText,
@@ -33,6 +34,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: Home, current: pathname === '/dashboard' },
+    { name: 'Clients', href: '/client-management', icon: Users, current: pathname === '/client-management' },
     { name: 'Matters', href: '/matter-management', icon: Briefcase, current: pathname === '/matter-management' },
     { name: 'Contracts', href: '/contract-management', icon: FileText, current: pathname === '/contract-management' },
     { name: 'Disputes', href: '/dispute-management', icon: Scale, current: pathname === '/dispute-management' },

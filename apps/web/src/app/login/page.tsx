@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Brain, Scale, Shield, Loader2, Eye, EyeOff } from 'lucide-react';
+import { useAuth } from '../../providers/auth-provider';
 
 // Custom UI Components
 const Card = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
@@ -140,37 +141,26 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   
   const router = useRouter();
+  const { login, loading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
 
-    try {
-      // Mock authentication for demo
-      if (email && password) {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Store auth token
-        if (rememberMe) {
-          localStorage.setItem('counselflow_token', 'mock-jwt-token');
-        } else {
-          sessionStorage.setItem('counselflow_token', 'mock-jwt-token');
-        }
-        
-        router.push('/dashboard');
-      } else {
-        setError('Please fill in all fields');
-      }
-    } catch (err) {
-      setError('Login failed. Please try again.');
-    } finally {
-      setIsLoading(false);
+    if (!email || !password) {
+      setError('Please fill in all fields');
+      return;
+    }
+
+    const result = await login({ email, password }, rememberMe);
+    
+    if (result.success) {
+      router.push('/dashboard');
+    } else {
+      setError(result.error || 'Login failed. Please try again.');
     }
   };
 
@@ -288,10 +278,10 @@ export default function LoginPage() {
 
               <Button
                 type="submit"
-                disabled={isLoading}
+                disabled={loading}
                 className="w-full"
               >
-                {isLoading ? (
+                {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Signing in...

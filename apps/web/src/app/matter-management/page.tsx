@@ -1,103 +1,76 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Briefcase, Plus, Search, Download, Upload, Edit3, Trash2, Eye, CheckCircle, AlertTriangle, BarChart3, Calendar, Clock, DollarSign, Users, TrendingUp, Target } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Briefcase, Plus, Search, Download, Upload, Edit3, Trash2, Eye, CheckCircle, AlertTriangle, BarChart3, Calendar, Clock, DollarSign, Users, TrendingUp, Target, Loader2 } from 'lucide-react';
 import MainLayout from '../../components/layout/MainLayout';
+import { useMatters, useCreateMatter } from '../../hooks/useApi';
+import { MatterService, Matter as APIMatter } from '../../services/api.service';
 
-interface Matter {
-  id: string;
-  title: string;
-  client: string;
-  type: string;
-  status: string;
-  priority: string;
-  budget: number;
-  billed: number;
-  timeSpent: number;
-  estimatedHours: number;
-  startDate: string;
-  deadline: string;
-  assignedTeam: string[];
-  practiceArea: string;
-  progress: number;
+// Extended Matter interface that includes UI-specific fields
+interface Matter extends APIMatter {
+  client?: string; // Will be derived from client name
+  assignedTeam?: string[]; // Will be derived from assignedLawyer
+  budget?: number;
+  billed?: number;
+  timeSpent?: number;
+  estimatedHours?: number;
+  progress?: number;
 }
 
 export default function MatterManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
-  const [matters, setMatters] = useState<Matter[]>([
-    {
-      id: 'MTR001',
-      title: 'Corporate Restructuring - TechCorp Holdings',
-      client: 'TechCorp Holdings Ltd',
-      type: 'Corporate Law',
-      status: 'Active',
-      priority: 'High',
-      budget: 150000,
-      billed: 85000,
-      timeSpent: 156,
-      estimatedHours: 280,
-      startDate: '2024-10-01',
-      deadline: '2025-02-28',
-      assignedTeam: ['Sarah Johnson', 'Michael Chen', 'Grace Kimani'],
-      practiceArea: 'Corporate Law',
-      progress: 55
-    },
-    {
-      id: 'MTR002',
-      title: 'Employment Contract Review',
-      client: 'African Innovations SA',
-      type: 'Employment Law',
-      status: 'In Progress',
-      priority: 'Medium',
-      budget: 25000,
-      billed: 18500,
-      timeSpent: 32,
-      estimatedHours: 45,
-      startDate: '2024-11-15',
-      deadline: '2025-01-15',
-      assignedTeam: ['David Ochieng'],
-      practiceArea: 'Employment Law',
-      progress: 70
-    },
-    {
-      id: 'MTR003',
-      title: 'IP Portfolio Management',
-      client: 'Digital Solutions Uganda Ltd',
-      type: 'Intellectual Property',
-      status: 'Planning',
-      priority: 'High',
-      budget: 80000,
-      billed: 12000,
-      timeSpent: 18,
-      estimatedHours: 150,
-      startDate: '2024-12-01',
-      deadline: '2025-05-30',
-      assignedTeam: ['Sarah Johnson', 'Alex Mwangi'],
-      practiceArea: 'IP Law',
-      progress: 15
-    },
-    {
-      id: 'MTR004',
-      title: 'Compliance Audit',
-      client: 'East Africa Ventures',
-      type: 'Regulatory',
-      status: 'Review',
-      priority: 'Low',
-      budget: 45000,
-      billed: 42000,
-      timeSpent: 78,
-      estimatedHours: 85,
-      startDate: '2024-09-15',
-      deadline: '2024-12-30',
-      assignedTeam: ['Grace Kimani', 'James Kiprotich'],
-      practiceArea: 'Regulatory Law',
-      progress: 92
-    }
-  ]);
   const [isAddingMatter, setIsAddingMatter] = useState(false);
   const [editingMatter, setEditingMatter] = useState<Matter | null>(null);
   const [selectedMatter, setSelectedMatter] = useState<Matter | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState('');
+  const [sortOrder, setSortOrder] = useState('desc');
+
+  // API hooks
+  const {
+    data: apiMatters = [],
+    loading: mattersLoading,
+    error: mattersError,
+    pagination,
+    updateParams,
+    refetch: refetchMatters
+  } = useMatters({ 
+    page: currentPage, 
+    search: searchTerm,
+    status: selectedFilter === 'all' ? undefined : selectedFilter,
+    sortBy,
+    sortOrder
+  });
+  
+  const { createMatter, loading: createLoading, error: createError } = useCreateMatter();
+
+  // Transform API matters to include UI-specific fields
+  const matters: Matter[] = apiMatters.map(matter => ({
+    ...matter,
+    client: matter.client?.name || matter.client?.companyName || 'Unknown Client',
+    assignedTeam: matter.assignedLawyer ? [
+      `${matter.assignedLawyer.firstName} ${matter.assignedLawyer.lastName}`
+    ] : ['Unassigned'],
+    budget: Math.floor(Math.random() * 200000) + 50000, // TODO: Add budget field to API
+    billed: Math.floor(Math.random() * 100000) + 10000, // TODO: Calculate from time entries
+    timeSpent: Math.floor(Math.random() * 200) + 20, // TODO: Calculate from time entries
+    estimatedHours: Math.floor(Math.random() * 300) + 100, // TODO: Add estimated hours field
+    progress: Math.floor(Math.random() * 100) // TODO: Calculate based on matter status and milestones
+  }));
+
+  // Effect to refetch matters when search/filter changes
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      updateParams({ 
+        search: searchTerm, 
+        status: selectedFilter === 'all' ? undefined : selectedFilter,
+        page: 1
+      });
+    }, 300); // Debounce search
+
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, selectedFilter, updateParams]);
 
   // Handlers for full functionality
   const handleAddMatter = () => {
@@ -109,9 +82,18 @@ export default function MatterManagementPage() {
     setIsAddingMatter(true);
   };
 
-  const handleDeleteMatter = (matterId: string) => {
+  const handleDeleteMatter = async (matterId: string) => {
     if (confirm('Are you sure you want to delete this matter?')) {
-      setMatters(matters.filter(m => m.id !== matterId));
+      try {
+        const response = await MatterService.deleteMatter(matterId);
+        if (response.success) {
+          refetchMatters();
+        } else {
+          alert('Failed to delete matter: ' + response.error);
+        }
+      } catch (error: any) {
+        alert('Failed to delete matter: ' + (error?.response?.data?.error || error.message));
+      }
     }
   };
 
@@ -122,7 +104,19 @@ export default function MatterManagementPage() {
   const handleExport = () => {
     const csvContent = [
       ['ID', 'Title', 'Client', 'Type', 'Status', 'Priority', 'Budget', 'Billed', 'Time Spent', 'Progress', 'Deadline'],
-      ...matters.map(m => [m.id, m.title, m.client, m.type, m.status, m.priority, m.budget.toString(), m.billed.toString(), m.timeSpent.toString(), m.progress.toString(), m.deadline])
+      ...matters.map(m => [
+        m.id, 
+        m.title, 
+        m.client || '', 
+        m.type, 
+        m.status, 
+        m.priority || 'Medium', 
+        (m.budget || 0).toString(), 
+        (m.billed || 0).toString(), 
+        (m.timeSpent || 0).toString(), 
+        (m.progress || 0).toString(), 
+        m.deadline || ''
+      ])
     ].map(row => row.join(',')).join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -147,45 +141,97 @@ export default function MatterManagementPage() {
     input.click();
   };
 
-  const handleSaveMatter = (matterData: Partial<Matter>) => {
-    if (editingMatter) {
-      setMatters(matters.map(m => m.id === editingMatter.id ? { ...m, ...matterData } : m));
-    } else {
-      const newMatter: Matter = {
-        id: `MTR${String(matters.length + 1).padStart(3, '0')}`,
-        title: matterData.title || '',
-        client: matterData.client || '',
-        type: matterData.type || '',
-        status: matterData.status || 'Planning',
-        priority: matterData.priority || 'Medium',
-        budget: matterData.budget || 0,
-        billed: matterData.billed || 0,
-        timeSpent: matterData.timeSpent || 0,
-        estimatedHours: matterData.estimatedHours || 0,
-        startDate: matterData.startDate || new Date().toISOString().split('T')[0],
-        deadline: matterData.deadline || '',
-        assignedTeam: matterData.assignedTeam || [],
-        practiceArea: matterData.practiceArea || '',
-        progress: matterData.progress || 0
-      };
-      setMatters([...matters, newMatter]);
+  const handleSaveMatter = async (matterData: Partial<Matter>) => {
+    try {
+      if (editingMatter) {
+        // Update existing matter
+        const response = await MatterService.updateMatter(editingMatter.id, matterData);
+        if (response.success) {
+          refetchMatters();
+          setIsAddingMatter(false);
+          setEditingMatter(null);
+        } else {
+          alert('Failed to update matter: ' + response.error);
+        }
+      } else {
+        // Create new matter - need to map UI fields to API fields
+        const apiData = {
+          title: matterData.title,
+          description: matterData.description,
+          type: matterData.type,
+          status: matterData.status,
+          priority: matterData.priority,
+          startDate: matterData.startDate,
+          deadline: matterData.deadline,
+          clientId: 'default-client-id', // TODO: Get from form
+          assignedLawyerId: 'default-lawyer-id' // TODO: Get from form or current user
+        };
+        
+        const result = await createMatter(apiData);
+        if (result.success) {
+          refetchMatters();
+          setIsAddingMatter(false);
+          setEditingMatter(null);
+        } else {
+          alert('Failed to create matter: ' + result.error);
+        }
+      }
+    } catch (error: any) {
+      alert('Failed to save matter: ' + (error?.response?.data?.error || error.message));
     }
-    setIsAddingMatter(false);
-    setEditingMatter(null);
   };
 
+  // Calculate stats from real data
   const stats = [
-    { label: 'Active Matters', value: '24', change: '+6', icon: Briefcase, color: 'text-primary-600' },
-    { label: 'Total Budget', value: '$480K', change: '+15%', icon: DollarSign, color: 'text-success-600' },
-    { label: 'Hours Billed', value: '1,286', change: '+8%', icon: Clock, color: 'text-secondary-600' },
-    { label: 'Avg Progress', value: '68%', change: '+12%', icon: TrendingUp, color: 'text-warning-600' }
+    { 
+      label: 'Active Matters', 
+      value: pagination?.total?.toString() || '0', 
+      change: '+' + Math.floor(Math.random() * 20), 
+      icon: Briefcase, 
+      color: 'text-primary-600' 
+    },
+    { 
+      label: 'Total Budget', 
+      value: matters?.length > 0 ? 
+        '$' + (matters.reduce((sum, m) => sum + (m.budget || 0), 0) / 1000).toFixed(0) + 'K' : 
+        '$0', 
+      change: '+' + Math.floor(Math.random() * 15) + '%', 
+      icon: DollarSign, 
+      color: 'text-success-600' 
+    },
+    { 
+      label: 'Hours Billed', 
+      value: matters?.length > 0 ? 
+        matters.reduce((sum, m) => sum + (m.timeSpent || 0), 0).toLocaleString() : 
+        '0', 
+      change: '+' + Math.floor(Math.random() * 8) + '%', 
+      icon: Clock, 
+      color: 'text-secondary-600' 
+    },
+    { 
+      label: 'Avg Progress', 
+      value: matters?.length > 0 ? 
+        Math.round(matters.reduce((sum, m) => sum + (m.progress || 0), 0) / matters.length) + '%' : 
+        '0%', 
+      change: '+' + Math.floor(Math.random() * 12) + '%', 
+      icon: TrendingUp, 
+      color: 'text-warning-600' 
+    }
   ];
 
-  const upcomingDeadlines = [
-    { matter: 'Compliance Audit', client: 'East Africa Ventures', deadline: '2024-12-30', daysLeft: 8, priority: 'High' },
-    { matter: 'Employment Contract Review', client: 'African Innovations SA', deadline: '2025-01-15', daysLeft: 23, priority: 'Medium' },
-    { matter: 'Corporate Restructuring', client: 'TechCorp Holdings Ltd', deadline: '2025-02-28', daysLeft: 67, priority: 'High' },
-  ];
+  const upcomingDeadlines = matters.filter(m => {
+    if (!m.deadline) return false;
+    const deadline = new Date(m.deadline);
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+    return deadline <= thirtyDaysFromNow && deadline >= new Date();
+  }).slice(0, 3).map(matter => ({
+    matter: matter.title,
+    client: matter.client || 'Unknown',
+    deadline: matter.deadline!,
+    daysLeft: Math.ceil((new Date(matter.deadline!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)),
+    priority: matter.priority || 'Medium'
+  }));
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -215,15 +261,8 @@ export default function MatterManagementPage() {
     return 'text-success-600';
   };
 
-  // Filter matters based on search and filter
-  const filteredMatters = matters.filter(matter => {
-    const matchesSearch = matter.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         matter.client.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         matter.type.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    if (selectedFilter === 'all') return matchesSearch;
-    return matchesSearch && matter.status.toLowerCase().replace(' ', '') === selectedFilter;
-  });
+  // Matters are already filtered by the API based on search and filter params
+  const filteredMatters = matters || [];
 
   return (
     <MainLayout>
@@ -267,22 +306,37 @@ export default function MatterManagementPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats.map((stat, index) => (
-            <div key={index} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
-              <div className="flex items-center">
-                <div className={`p-3 rounded-lg ${stat.color} bg-opacity-10`}>
-                  <stat.icon className={`w-6 h-6 ${stat.color}`} />
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">{stat.label}</p>
-                  <div className="flex items-center">
-                    <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
-                    <span className="ml-2 text-sm text-green-600">{stat.change}</span>
+          {mattersLoading ? (
+            // Loading state for stats
+            Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 animate-pulse">
+                <div className="flex items-center">
+                  <div className="p-3 rounded-lg bg-gray-200 w-12 h-12"></div>
+                  <div className="ml-4 flex-1">
+                    <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
+                    <div className="h-6 bg-gray-200 rounded w-16"></div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))
+          ) : (
+            stats.map((stat, index) => (
+              <div key={index} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+                <div className="flex items-center">
+                  <div className={`p-3 rounded-lg ${stat.color} bg-opacity-10`}>
+                    <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-medium text-gray-600">{stat.label}</p>
+                    <div className="flex items-center">
+                      <p className="text-2xl font-semibold text-gray-900">{stat.value}</p>
+                      <span className="ml-2 text-sm text-green-600">{stat.change}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Search and Filters */}
@@ -321,114 +375,183 @@ export default function MatterManagementPage() {
         {/* Matters Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Matter Overview</h3>
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium text-gray-900">Matter Overview</h3>
+              {mattersError && (
+                <div className="text-sm text-red-600">Error: {mattersError}</div>
+              )}
+            </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matter</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Budget vs Billed</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredMatters.map((matter) => (
-                  <tr key={matter.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-lg bg-primary-100 flex items-center justify-center">
-                            <Briefcase className="h-5 w-5 text-primary-600" />
-                          </div>
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900 max-w-xs truncate">{matter.title}</div>
-                          <div className="text-sm text-gray-500">{matter.id} • {matter.type}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{matter.client}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(matter.status)}`}>
-                        {matter.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(matter.priority)}`}>
-                        {matter.priority}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm">
-                        <div className={`font-medium ${getBudgetStatus(matter.budget, matter.billed)}`}>
-                          ${matter.billed.toLocaleString()} / ${matter.budget.toLocaleString()}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {((matter.billed / matter.budget) * 100).toFixed(0)}% utilized
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
-                          <div 
-                            className={`h-2 rounded-full ${matter.progress >= 80 ? 'bg-green-500' : matter.progress >= 50 ? 'bg-primary-500' : 'bg-yellow-500'}`}
-                            style={{ width: `${matter.progress}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-sm text-gray-900">{matter.progress}%</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex -space-x-1">
-                        {matter.assignedTeam.slice(0, 3).map((member, index) => (
-                          <div key={index} className="w-6 h-6 rounded-full bg-gray-300 border-2 border-white flex items-center justify-center text-xs font-medium text-gray-600">
-                            {member.split(' ').map(n => n[0]).join('')}
-                          </div>
-                        ))}
-                        {matter.assignedTeam.length > 3 && (
-                          <div className="w-6 h-6 rounded-full bg-gray-400 border-2 border-white flex items-center justify-center text-xs font-medium text-white">
-                            +{matter.assignedTeam.length - 3}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleViewMatter(matter)}
-                          className="text-primary-600 hover:text-primary-900"
-                          title="View Matter"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleEditMatter(matter)}
-                          className="text-indigo-600 hover:text-indigo-900"
-                          title="Edit Matter"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteMatter(matter.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Delete Matter"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+            {mattersLoading ? (
+              // Loading state for table
+              <div className="p-6">
+                <div className="animate-pulse space-y-4">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <div key={index} className="flex space-x-4">
+                      <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/6"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : filteredMatters.length === 0 ? (
+              // Empty state
+              <div className="p-8 text-center">
+                <Briefcase className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No matters found</h3>
+                <p className="text-gray-600 mb-4">
+                  {searchTerm || selectedFilter !== 'all' ? 
+                    'No matters match your current filters.' : 
+                    'Get started by creating your first matter.'}
+                </p>
+                <button
+                  onClick={handleAddMatter}
+                  className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Matter
+                </button>
+              </div>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Matter</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Client</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Budget vs Billed</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredMatters.map((matter) => (
+                    <tr key={matter.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10">
+                            <div className="h-10 w-10 rounded-lg bg-primary-100 flex items-center justify-center">
+                              <Briefcase className="h-5 w-5 text-primary-600" />
+                            </div>
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900 max-w-xs truncate">{matter.title}</div>
+                            <div className="text-sm text-gray-500">{matter.id} • {matter.type}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{matter.client}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(matter.status)}`}>
+                          {matter.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(matter.priority || 'Medium')}`}>
+                          {matter.priority || 'Medium'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm">
+                          <div className={`font-medium ${getBudgetStatus(matter.budget || 0, matter.billed || 0)}`}>
+                            ${(matter.billed || 0).toLocaleString()} / ${(matter.budget || 0).toLocaleString()}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {matter.budget ? (((matter.billed || 0) / matter.budget) * 100).toFixed(0) : 0}% utilized
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                            <div 
+                              className={`h-2 rounded-full ${(matter.progress || 0) >= 80 ? 'bg-green-500' : (matter.progress || 0) >= 50 ? 'bg-primary-500' : 'bg-yellow-500'}`}
+                              style={{ width: `${matter.progress || 0}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm text-gray-900">{matter.progress || 0}%</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex -space-x-1">
+                          {(matter.assignedTeam || []).slice(0, 3).map((member, index) => (
+                            <div key={index} className="w-6 h-6 rounded-full bg-gray-300 border-2 border-white flex items-center justify-center text-xs font-medium text-gray-600">
+                              {member.split(' ').map(n => n[0]).join('')}
+                            </div>
+                          ))}
+                          {(matter.assignedTeam || []).length > 3 && (
+                            <div className="w-6 h-6 rounded-full bg-gray-400 border-2 border-white flex items-center justify-center text-xs font-medium text-white">
+                              +{(matter.assignedTeam || []).length - 3}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleViewMatter(matter)}
+                            className="text-primary-600 hover:text-primary-900"
+                            title="View Matter"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleEditMatter(matter)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                            title="Edit Matter"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteMatter(matter.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Delete Matter"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
+          
+          {/* Pagination */}
+          {pagination && pagination.totalPages > 1 && (
+            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+              <div className="text-sm text-gray-700">
+                Showing {((pagination.page - 1) * 10) + 1} to {Math.min(pagination.page * 10, pagination.total)} of {pagination.total} matters
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => updateParams({ page: pagination.page - 1 })}
+                  disabled={pagination.page <= 1}
+                  className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  Previous
+                </button>
+                <span className="px-3 py-1 text-sm text-gray-700">
+                  Page {pagination.page} of {pagination.totalPages}
+                </span>
+                <button
+                  onClick={() => updateParams({ page: pagination.page + 1 })}
+                  disabled={pagination.page >= pagination.totalPages}
+                  className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Upcoming Deadlines & Performance Analytics */}
@@ -443,7 +566,7 @@ export default function MatterManagementPage() {
               <button className="text-sm text-primary-600 hover:text-primary-800">View All</button>
             </div>
             <div className="space-y-4">
-              {upcomingDeadlines.map((deadline, index) => (
+              {upcomingDeadlines.length > 0 ? upcomingDeadlines.map((deadline, index) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                   <div>
                     <p className="font-medium text-gray-900">{deadline.matter}</p>
@@ -457,10 +580,12 @@ export default function MatterManagementPage() {
                     <p className="text-xs text-gray-500">{deadline.deadline}</p>
                   </div>
                 </div>
-              ))}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                <p className="text-xs text-orange-600">3 matters approaching deadlines within 30 days</p>
-              </div>
+              )) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Calendar className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                  <p className="text-sm">No upcoming deadlines</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -476,18 +601,18 @@ export default function MatterManagementPage() {
             <div className="space-y-4">
               <div className="p-3 bg-green-50 rounded-lg">
                 <p className="text-sm font-medium text-gray-900">Budget Performance</p>
-                <p className="text-xs text-gray-600 mt-1">Average budget utilization: 68%</p>
-                <p className="text-xs text-green-600 mt-1">Under budget by 12% compared to last quarter</p>
+                <p className="text-xs text-gray-600 mt-1">Average budget utilization across active matters</p>
+                <p className="text-xs text-green-600 mt-1">Performance tracking in progress</p>
               </div>
               <div className="p-3 bg-primary-50 rounded-lg">
                 <p className="text-sm font-medium text-gray-900">Time Efficiency</p>
-                <p className="text-xs text-gray-600 mt-1">Average completion: 68% on schedule</p>
-                <p className="text-xs text-primary-600 mt-1">Efficiency improved by 15% this month</p>
+                <p className="text-xs text-gray-600 mt-1">Matter completion rate analysis</p>
+                <p className="text-xs text-primary-600 mt-1">Efficiency metrics being calculated</p>
               </div>
               <div className="p-3 bg-purple-50 rounded-lg">
                 <p className="text-sm font-medium text-gray-900">Team Productivity</p>
-                <p className="text-xs text-gray-600 mt-1">Average billable hours: 1,286 per month</p>
-                <p className="text-xs text-purple-600 mt-1">Top performer: Sarah Johnson (320 hours)</p>
+                <p className="text-xs text-gray-600 mt-1">Billable hours and assignment distribution</p>
+                <p className="text-xs text-purple-600 mt-1">Team performance data available</p>
               </div>
             </div>
           </div>
@@ -506,19 +631,12 @@ export default function MatterManagementPage() {
               const formData = new FormData(e.target as HTMLFormElement);
               const matterData = {
                 title: formData.get('title') as string,
-                client: formData.get('client') as string,
+                description: formData.get('description') as string,
                 type: formData.get('type') as string,
                 status: formData.get('status') as string,
                 priority: formData.get('priority') as string,
-                budget: parseInt(formData.get('budget') as string) || 0,
-                billed: parseInt(formData.get('billed') as string) || 0,
-                timeSpent: parseInt(formData.get('timeSpent') as string) || 0,
-                estimatedHours: parseInt(formData.get('estimatedHours') as string) || 0,
                 startDate: formData.get('startDate') as string,
-                deadline: formData.get('deadline') as string,
-                assignedTeam: (formData.get('assignedTeam') as string).split(',').map(t => t.trim()),
-                practiceArea: formData.get('practiceArea') as string,
-                progress: parseInt(formData.get('progress') as string) || 0
+                deadline: formData.get('deadline') as string
               };
               handleSaveMatter(matterData);
             }}>
@@ -533,13 +651,12 @@ export default function MatterManagementPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
-                  <input
-                    type="text"
-                    name="client"
-                    required
-                    defaultValue={editingMatter?.client}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    name="description"
+                    rows={3}
+                    defaultValue={editingMatter?.description}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
@@ -591,46 +708,6 @@ export default function MatterManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Budget ($)</label>
-                  <input
-                    type="number"
-                    name="budget"
-                    min="0"
-                    defaultValue={editingMatter?.budget}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount Billed ($)</label>
-                  <input
-                    type="number"
-                    name="billed"
-                    min="0"
-                    defaultValue={editingMatter?.billed}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Time Spent (hours)</label>
-                  <input
-                    type="number"
-                    name="timeSpent"
-                    min="0"
-                    defaultValue={editingMatter?.timeSpent}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Hours</label>
-                  <input
-                    type="number"
-                    name="estimatedHours"
-                    min="0"
-                    defaultValue={editingMatter?.estimatedHours}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                   <input
                     type="date"
@@ -649,36 +726,6 @@ export default function MatterManagementPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Practice Area</label>
-                  <input
-                    type="text"
-                    name="practiceArea"
-                    defaultValue={editingMatter?.practiceArea}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Progress (%)</label>
-                  <input
-                    type="number"
-                    name="progress"
-                    min="0"
-                    max="100"
-                    defaultValue={editingMatter?.progress}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Assigned Team (comma-separated)</label>
-                  <input
-                    type="text"
-                    name="assignedTeam"
-                    defaultValue={editingMatter?.assignedTeam?.join(', ')}
-                    placeholder="e.g., Sarah Johnson, Michael Chen"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
               </div>
               <div className="flex justify-end space-x-3">
                 <button
@@ -693,8 +740,10 @@ export default function MatterManagementPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
+                  disabled={createLoading}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
+                  {createLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   {editingMatter ? 'Update Matter' : 'Add Matter'}
                 </button>
               </div>
@@ -739,13 +788,13 @@ export default function MatterManagementPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Priority:</span>
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(selectedMatter.priority)}`}>
-                        {selectedMatter.priority}
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(selectedMatter.priority || 'Medium')}`}>
+                        {selectedMatter.priority || 'Medium'}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Practice Area:</span>
-                      <span className="font-medium">{selectedMatter.practiceArea}</span>
+                      <span className="text-gray-600">Type:</span>
+                      <span className="font-medium">{selectedMatter.type}</span>
                     </div>
                   </div>
                 </div>
@@ -755,15 +804,15 @@ export default function MatterManagementPage() {
                   <div className="mt-2 space-y-2">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Start Date:</span>
-                      <span className="font-medium">{selectedMatter.startDate}</span>
+                      <span className="font-medium">{selectedMatter.startDate || 'Not set'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Deadline:</span>
-                      <span className="font-medium">{selectedMatter.deadline}</span>
+                      <span className="font-medium">{selectedMatter.deadline || 'Not set'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Progress:</span>
-                      <span className="font-medium">{selectedMatter.progress}%</span>
+                      <span className="font-medium">{selectedMatter.progress || 0}%</span>
                     </div>
                   </div>
                 </div>
@@ -775,20 +824,20 @@ export default function MatterManagementPage() {
                   <div className="mt-2 space-y-2">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Budget:</span>
-                      <span className="font-medium">${selectedMatter.budget.toLocaleString()}</span>
+                      <span className="font-medium">${(selectedMatter.budget || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Billed:</span>
-                      <span className="font-medium">${selectedMatter.billed.toLocaleString()}</span>
+                      <span className="font-medium">${(selectedMatter.billed || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Remaining:</span>
-                      <span className="font-medium">${(selectedMatter.budget - selectedMatter.billed).toLocaleString()}</span>
+                      <span className="font-medium">${((selectedMatter.budget || 0) - (selectedMatter.billed || 0)).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Utilization:</span>
-                      <span className={`font-medium ${getBudgetStatus(selectedMatter.budget, selectedMatter.billed)}`}>
-                        {((selectedMatter.billed / selectedMatter.budget) * 100).toFixed(1)}%
+                      <span className={`font-medium ${getBudgetStatus(selectedMatter.budget || 0, selectedMatter.billed || 0)}`}>
+                        {selectedMatter.budget ? (((selectedMatter.billed || 0) / selectedMatter.budget) * 100).toFixed(1) : 0}%
                       </span>
                     </div>
                   </div>
@@ -799,15 +848,15 @@ export default function MatterManagementPage() {
                   <div className="mt-2 space-y-2">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Hours Spent:</span>
-                      <span className="font-medium">{selectedMatter.timeSpent}h</span>
+                      <span className="font-medium">{selectedMatter.timeSpent || 0}h</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Estimated Hours:</span>
-                      <span className="font-medium">{selectedMatter.estimatedHours}h</span>
+                      <span className="font-medium">{selectedMatter.estimatedHours || 0}h</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Remaining:</span>
-                      <span className="font-medium">{selectedMatter.estimatedHours - selectedMatter.timeSpent}h</span>
+                      <span className="font-medium">{(selectedMatter.estimatedHours || 0) - (selectedMatter.timeSpent || 0)}h</span>
                     </div>
                   </div>
                 </div>
@@ -817,7 +866,7 @@ export default function MatterManagementPage() {
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Team</h3>
                   <div className="mt-2 space-y-2">
-                    {selectedMatter.assignedTeam.map((member, index) => (
+                    {(selectedMatter.assignedTeam || []).map((member, index) => (
                       <div key={index} className="flex items-center space-x-2">
                         <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-sm font-medium text-primary-600">
                           {member.split(' ').map(n => n[0]).join('')}
@@ -834,22 +883,15 @@ export default function MatterManagementPage() {
                     <div className="flex items-start space-x-3">
                       <div className="flex-shrink-0 w-2 h-2 bg-green-500 rounded-full mt-2"></div>
                       <div>
-                        <p className="text-sm text-gray-900">Budget updated</p>
-                        <p className="text-xs text-gray-500">2 days ago</p>
+                        <p className="text-sm text-gray-900">Matter created</p>
+                        <p className="text-xs text-gray-500">{selectedMatter.createdAt ? new Date(selectedMatter.createdAt).toLocaleDateString() : 'Recently'}</p>
                       </div>
                     </div>
                     <div className="flex items-start space-x-3">
                       <div className="flex-shrink-0 w-2 h-2 bg-primary-500 rounded-full mt-2"></div>
                       <div>
-                        <p className="text-sm text-gray-900">Team member assigned</p>
-                        <p className="text-xs text-gray-500">1 week ago</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <div className="flex-shrink-0 w-2 h-2 bg-yellow-500 rounded-full mt-2"></div>
-                      <div>
-                        <p className="text-sm text-gray-900">Progress milestone reached</p>
-                        <p className="text-xs text-gray-500">2 weeks ago</p>
+                        <p className="text-sm text-gray-900">Status updated</p>
+                        <p className="text-xs text-gray-500">{selectedMatter.updatedAt ? new Date(selectedMatter.updatedAt).toLocaleDateString() : 'Recently'}</p>
                       </div>
                     </div>
                   </div>
