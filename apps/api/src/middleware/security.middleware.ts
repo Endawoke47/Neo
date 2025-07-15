@@ -5,8 +5,10 @@ import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { AuthenticatedRequest } from './auth.middleware';
+import { logger, securityLogger } from '../config/logger';
+import { env } from '../config/environment';
 
-// Rate limiting configurations
+// Enhanced rate limiting configurations with logging
 export const createRateLimit = (windowMs: number, max: number, message?: string) => {
   return rateLimit({
     windowMs,
@@ -18,6 +20,16 @@ export const createRateLimit = (windowMs: number, max: number, message?: string)
     standardHeaders: true,
     legacyHeaders: false,
     handler: (req, res) => {
+      // Log rate limit violations for security monitoring
+      securityLogger.suspiciousActivity('system', 'rate_limit_exceeded', {
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        path: req.path,
+        method: req.method,
+        limit: max,
+        window: windowMs
+      });
+      
       res.status(429).json({
         success: false,
         error: message || 'Too many requests, please try again later',
@@ -27,10 +39,10 @@ export const createRateLimit = (windowMs: number, max: number, message?: string)
   });
 };
 
-// General rate limiting
+// General rate limiting - use environment configuration
 export const generalLimiter = createRateLimit(
-  15 * 60 * 1000, // 15 minutes
-  100, // 100 requests per window
+  env.RATE_LIMIT_WINDOW_MS,
+  env.RATE_LIMIT_MAX_REQUESTS,
   'Too many requests from this IP, please try again later'
 );
 
@@ -118,8 +130,48 @@ export const corsOptions = {
   exposedHeaders: ['X-Total-Count', 'X-Page-Count']
 };
 
-// Input sanitization middleware
+// Enhanced input sanitization middleware with threat detection
 export const sanitizeInput = (req: Request, res: Response, next: NextFunction) => {
+  const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
+  
+  // Detect potential threats before sanitization
+  const requestData = JSON.stringify({
+    body: req.body,
+    query: req.query,
+    params: req.params
+  });
+  
+  // Check for suspicious patterns
+  const suspiciousPatterns = [
+    /select.*from/i,
+    /union.*select/i,
+    /insert.*into/i,
+    /delete.*from/i,
+    /drop.*table/i,
+    /<script/i,
+    /javascript:/i,
+    /\.\.\/.*etc\/passwd/i,
+    /cmd\.exe/i
+  ];
+  
+  for (const pattern of suspiciousPatterns) {
+    if (pattern.test(requestData)) {
+      securityLogger.suspiciousActivity('system', 'malicious_pattern_detected', {
+        ip: clientIp,
+        pattern: pattern.source,
+        path: req.path,
+        method: req.method
+      });
+      
+      // Log for investigation but continue - pattern might be legitimate
+      logger.warn('Potentially malicious pattern detected', {
+        ip: clientIp,
+        pattern: pattern.source,
+        path: req.path
+      });
+    }
+  }
+  
   // Sanitize request body
   if (req.body && typeof req.body === 'object') {
     req.body = sanitizeObject(req.body);
@@ -329,13 +381,36 @@ export const ipWhitelist = (allowedIPs: string[]) => {
   };
 };
 
-// Request timing middleware for monitoring
+// Enhanced request timing middleware with security monitoring
 export const requestTiming = (req: Request, res: Response, next: NextFunction) => {
   const startTime = Date.now();
+  const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
   
   res.on('finish', () => {
     const duration = Date.now() - startTime;
-    console.log(`${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`);
+    
+    // Log performance metrics
+    logger.info(`${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`);
+    
+    // Alert on unusually slow requests (potential DoS)
+    if (duration > 10000) { // 10 seconds
+      securityLogger.suspiciousActivity('system', 'slow_request_detected', {
+        ip: clientIp,
+        path: req.path,
+        method: req.method,
+        duration: `${duration}ms`,
+        statusCode: res.statusCode
+      });
+    }
+    
+    // Track security-relevant requests
+    if (req.path.includes('/auth') || req.path.includes('/admin') || res.statusCode >= 400) {
+      securityLogger.dataAccess(
+        (req as any).user?.id || 'anonymous',
+        req.path,
+        req.method
+      );
+    }
   });
   
   next();
@@ -383,7 +458,7 @@ export const validateContentType = (allowedTypes: string[]) => {
   };
 };
 
-// Request ID middleware
+// Enhanced Request ID middleware with correlation tracking
 export const addRequestId = (req: Request, res: Response, next: NextFunction) => {
   const requestId = req.headers['x-request-id'] as string || 
                    `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -391,5 +466,56 @@ export const addRequestId = (req: Request, res: Response, next: NextFunction) =>
   req.headers['x-request-id'] = requestId;
   res.setHeader('X-Request-ID', requestId);
   
+  // Add to logger context for correlation
+  logger.info('Request started', {
+    requestId,
+    method: req.method,
+    path: req.path,
+    ip: req.ip,
+    userAgent: req.get('User-Agent')
+  });
+  
   next();
 };
+
+// Suspicious activity monitoring
+const activityTracker = new Map<string, { count: number; lastActivity: number }>();
+
+export const monitorSuspiciousActivity = (req: Request, res: Response, next: NextFunction) => {
+  const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
+  const now = Date.now();
+  const key = `${clientIp}:${req.path}`;
+  
+  const activity = activityTracker.get(key);
+  
+  if (!activity || now - activity.lastActivity > 60000) { // 1 minute window
+    activityTracker.set(key, { count: 1, lastActivity: now });
+  } else {
+    activity.count++;
+    activity.lastActivity = now;
+    
+    // Alert on rapid repeated requests to same endpoint
+    if (activity.count > 20) {
+      securityLogger.suspiciousActivity('system', 'rapid_requests', {
+        ip: clientIp,
+        path: req.path,
+        count: activity.count,
+        timeWindow: '1minute'
+      });
+    }
+  }
+  
+  next();
+};
+
+// Clean up activity tracker periodically
+setInterval(() => {
+  const now = Date.now();
+  const maxAge = 300000; // 5 minutes
+  
+  for (const [key, activity] of activityTracker.entries()) {
+    if (now - activity.lastActivity > maxAge) {
+      activityTracker.delete(key);
+    }
+  }
+}, 60000); // Clean up every minute

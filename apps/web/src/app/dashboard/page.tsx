@@ -187,7 +187,6 @@ export default function DashboardPage() {
               variant="outline" 
               onClick={refreshDashboard}
               className="flex items-center space-x-2"
-              disabled={statsLoading || activitiesLoading}
             >
               <RefreshCw className={`h-4 w-4 ${(statsLoading || activitiesLoading) ? 'animate-spin' : ''}`} />
               <span>Refresh</span>

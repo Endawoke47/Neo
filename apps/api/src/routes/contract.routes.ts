@@ -68,13 +68,31 @@ router.post('/', async (req: AuthenticatedRequest, res) => {
 router.get('/stats', async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user!.id;
-    const stats = await ContractService.getContractStats(userId);
+    const { startDate, endDate, compareStartDate, compareEndDate } = req.query;
     
-    res.json({
-      success: true,
-      data: stats,
-      message: 'Contract statistics retrieved successfully'
-    });
+    // If date parameters are provided, use stats with comparison
+    if (startDate || endDate || compareStartDate || compareEndDate) {
+      const options = {
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        compareStartDate: compareStartDate ? new Date(compareStartDate as string) : undefined,
+        compareEndDate: compareEndDate ? new Date(compareEndDate as string) : undefined,
+      };
+      const stats = await ContractService.getContractStatsWithComparison(userId, options);
+      res.json({
+        success: true,
+        data: stats,
+        message: 'Contract statistics retrieved successfully'
+      });
+    } else {
+      // Default stats without comparison
+      const stats = await ContractService.getContractStatsWithComparison(userId);
+      res.json({
+        success: true,
+        data: stats,
+        message: 'Contract statistics retrieved successfully'
+      });
+    }
   } catch (error) {
     console.error('Error in GET /contracts/stats:', error);
     res.status(500).json({
@@ -259,5 +277,6 @@ router.post('/:id/duplicate', async (req: AuthenticatedRequest, res) => {
     });
   }
 });
+
 
 export default router;

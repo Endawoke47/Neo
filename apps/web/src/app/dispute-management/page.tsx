@@ -3,8 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import MainLayout from '../../components/layout/MainLayout';
 import { Scale, Plus, Search, Download, Upload, Edit3, Trash2, Eye, CheckCircle, AlertTriangle, BarChart3, Calendar, Brain, TrendingUp, Clock, DollarSign, Users, FileText, Loader2 } from 'lucide-react';
-import { useDisputes, useCreateDispute } from '../../hooks/useApi';
+import { useDisputes, useCreateDispute, useClients } from '../../hooks/useApi';
+import { useAuth } from '../../providers/auth-provider';
+import { useDebouncedSearch } from '../../hooks/useDebounced';
 import { DisputeService, Dispute as APIDispute } from '../../services/api.service';
+import SearchAndFilter from '../../components/ui/SearchAndFilter';
+import LoadingSkeleton from '../../components/ui/LoadingSkeleton';
+import EmptyState from '../../components/ui/EmptyState';
+import ErrorState from '../../components/ui/ErrorState';
 
 // Extended Dispute interface that includes UI-specific fields
 interface Dispute extends APIDispute {
@@ -22,6 +28,7 @@ interface Dispute extends APIDispute {
 export default function DisputeManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -44,11 +51,15 @@ export default function DisputeManagementPage() {
   
   const { createDispute, loading: createLoading, error: createError } = useCreateDispute();
 
+  // Get current user and clients for form state management
+  const { user } = useAuth();
+  const { data: clients = [] } = useClients({ limit: 100 }); // Get all clients for dropdown
+
   // Transform API disputes to include UI-specific fields
   const disputes: Dispute[] = apiDisputes.map(dispute => ({
     ...dispute,
     parties: [
-      dispute.client?.name || dispute.client?.companyName || 'Unknown Client',
+      dispute.client?.name || 'Unknown Client',
       'vs.',
       'Opposing Party' // TODO: Add opposing party field to API
     ],
@@ -184,20 +195,34 @@ export default function DisputeManagementPage() {
           alert('Failed to update dispute: ' + response.error);
         }
       } else {
+        // Validate required fields
+        const clientId = selectedClientId || disputeData.clientId;
+        const assignedLawyerId = user?.id || disputeData.assignedLawyerId;
+        
+        if (!clientId) {
+          alert('Please select a client for this dispute.');
+          return;
+        }
+        
+        if (!assignedLawyerId) {
+          alert('Unable to determine assigned lawyer. Please ensure you are logged in.');
+          return;
+        }
+        
         // Add new dispute
         const response = await createDispute({
           title: disputeData.title || '',
           description: disputeData.description || '',
           type: disputeData.type || '',
-          status: disputeData.status || 'Active',
-          priority: disputeData.priority || 'Medium',
-          riskLevel: disputeData.riskLevel || 'Medium',
+          status: disputeData.status || 'OPEN',
+          priority: disputeData.priority || 'MEDIUM',
+          riskLevel: disputeData.riskLevel || 'MEDIUM',
           claimAmount: disputeData.value || 0,
           currency: disputeData.currency || 'USD',
           courtName: disputeData.courtVenue || '',
           timeline: disputeData.expectedResolution || '',
-          clientId: 'temp-client-id', // TODO: Add client selection to form
-          assignedLawyerId: 'temp-lawyer-id' // TODO: Add lawyer selection to form
+          clientId,
+          assignedLawyerId
         });
         if (response.success) {
           refetchDisputes();
@@ -287,7 +312,7 @@ export default function DisputeManagementPage() {
   const filteredDisputes = disputes.filter(dispute => {
     const matchesSearch = dispute.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          dispute.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         dispute.attorney.toLowerCase().includes(searchTerm.toLowerCase());
+                         (dispute.attorney || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     if (selectedFilter === 'all') return matchesSearch;
     return matchesSearch && dispute.status.toLowerCase().replace(/[^a-z]/g, '') === selectedFilter;
@@ -457,17 +482,17 @@ export default function DisputeManagementPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${dispute.value.toLocaleString()}
+                      ${(dispute.claimAmount || 0).toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                           <div 
-                            className={`h-2 rounded-full ${dispute.winProbability >= 70 ? 'bg-green-500' : dispute.winProbability >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                            style={{ width: `${dispute.winProbability}%` }}
+                            className={`h-2 rounded-full ${(dispute.winProbability || 0) >= 70 ? 'bg-green-500' : (dispute.winProbability || 0) >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                            style={{ width: `${dispute.winProbability || 0}%` }}
                           ></div>
                         </div>
-                        <span className="text-sm text-gray-900">{dispute.winProbability}%</span>
+                        <span className="text-sm text-gray-900">{dispute.winProbability || 0}%</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{dispute.attorney}</td>
@@ -876,7 +901,7 @@ export default function DisputeManagementPage() {
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Parties</h3>
                   <div className="mt-2 space-y-1">
-                    {selectedDispute.parties.map((party, index) => (
+                    {(selectedDispute.parties || []).map((party, index) => (
                       <div key={index} className="text-sm text-gray-900">{party}</div>
                     ))}
                   </div>
@@ -889,15 +914,15 @@ export default function DisputeManagementPage() {
                   <div className="mt-2 space-y-2">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Case Value:</span>
-                      <span className="font-medium">${selectedDispute.value.toLocaleString()}</span>
+                      <span className="font-medium">${(selectedDispute.claimAmount || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Legal Costs:</span>
-                      <span className="font-medium">${selectedDispute.costs.toLocaleString()}</span>
+                      <span className="font-medium">${(selectedDispute.costs || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Cost Ratio:</span>
-                      <span className="font-medium">{((selectedDispute.costs / selectedDispute.value) * 100).toFixed(1)}%</span>
+                      <span className="font-medium">{(((selectedDispute.costs || 0) / (selectedDispute.claimAmount || 1)) * 100).toFixed(1)}%</span>
                     </div>
                   </div>
                 </div>
@@ -928,12 +953,12 @@ export default function DisputeManagementPage() {
                     <div>
                       <div className="flex justify-between mb-1">
                         <span className="text-gray-600">Win Probability:</span>
-                        <span className="font-medium">{selectedDispute.winProbability}%</span>
+                        <span className="font-medium">{selectedDispute.winProbability || 0}%</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div 
-                          className={`h-2 rounded-full ${selectedDispute.winProbability >= 70 ? 'bg-green-500' : selectedDispute.winProbability >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                          style={{ width: `${selectedDispute.winProbability}%` }}
+                          className={`h-2 rounded-full ${(selectedDispute.winProbability || 0) >= 70 ? 'bg-green-500' : (selectedDispute.winProbability || 0) >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                          style={{ width: `${selectedDispute.winProbability || 0}%` }}
                         ></div>
                       </div>
                     </div>

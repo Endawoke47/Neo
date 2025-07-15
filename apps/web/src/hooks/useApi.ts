@@ -149,6 +149,15 @@ export function useClient(id: string) {
   return useApi<Client>(() => ClientService.getClient(id), [id]);
 }
 
+export function useClientStats(options?: {
+  startDate?: Date;
+  endDate?: Date;
+  compareStartDate?: Date;
+  compareEndDate?: Date;
+}) {
+  return useApi<any>(() => ClientService.getClientStatsWithComparison(options), [options]);
+}
+
 // Matter hooks
 export function useMatters(params?: any) {
   return usePaginatedApi<Matter>(MatterService.getMatters, params);
@@ -165,6 +174,15 @@ export function useContracts(params?: any) {
 
 export function useContract(id: string) {
   return useApi<Contract>(() => ContractService.getContract(id), [id]);
+}
+
+export function useContractStats(options?: {
+  startDate?: Date;
+  endDate?: Date;
+  compareStartDate?: Date;
+  compareEndDate?: Date;
+}) {
+  return useApi<any>(() => ContractService.getContractStatsWithComparison(options), [options]);
 }
 
 // Document hooks

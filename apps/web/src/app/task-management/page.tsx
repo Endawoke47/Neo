@@ -3,9 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import MainLayout from '../../components/layout/MainLayout';
 import { CheckSquare, Plus, Search, Download, Upload, Edit3, Trash2, Eye, Clock, Calendar, User, AlertTriangle, TrendingUp, BarChart3, Target, Activity, Loader2 } from 'lucide-react';
-import { useTasks, useCreateTask, useUpdateTaskProgress } from '../../hooks/useApi';
+import { useTasks, useCreateTask, useUpdateTaskProgress, useUsers } from '../../hooks/useApi';
+import { useAuth } from '../../providers/auth-provider';
+import { useDebouncedSearch } from '../../hooks/useDebounced';
 import { TaskService, Task as APITask } from '../../services/api.service';
 import TaskFormModal from '../../components/modals/TaskFormModal';
+import SearchAndFilter from '../../components/ui/SearchAndFilter';
+import LoadingSkeleton from '../../components/ui/LoadingSkeleton';
+import EmptyState from '../../components/ui/EmptyState';
+import ErrorState from '../../components/ui/ErrorState';
 
 // Extended Task interface that includes UI-specific fields
 interface Task extends APITask {
@@ -18,6 +24,7 @@ interface Task extends APITask {
 export default function TaskManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -40,6 +47,10 @@ export default function TaskManagementPage() {
   
   const { createTask, loading: createLoading, error: createError } = useCreateTask();
   const { updateProgress, loading: progressLoading } = useUpdateTaskProgress();
+
+  // Get current user and users for form state management
+  const { user } = useAuth();
+  const { data: users = [] } = useUsers({ limit: 100 }); // Get all users for assignment
 
   // Transform API tasks to include UI-specific fields
   const tasks: Task[] = apiTasks.map(task => ({
@@ -156,32 +167,45 @@ export default function TaskManagementPage() {
           refetchTasks();
           setIsAddingTask(false);
           setEditingTask(null);
+          return { success: true };
         } else {
           alert('Failed to update task: ' + response.error);
+          return { success: false, error: response.error };
         }
       } else {
+        // Validate required fields
+        const assignedToId = selectedAssigneeId || taskData.assignedToId || user?.id;
+        
+        if (!assignedToId) {
+          alert('Please select an assignee for this task.');
+          return { success: false, error: 'Please select an assignee for this task.' };
+        }
+        
         // Add new task
         const response = await createTask({
           title: taskData.title || '',
           description: taskData.description || '',
-          priority: taskData.priority || 'Medium',
-          status: taskData.status || 'To Do',
+          priority: taskData.priority || 'MEDIUM',
+          status: taskData.status || 'TODO',
           dueDate: taskData.dueDate,
           estimatedHours: taskData.estimatedHours || 0,
           category: taskData.category || '',
           tags: taskData.tags || [],
-          assignedToId: 'temp-user-id' // TODO: Add user selection to form
+          assignedToId
         });
         if (response.success) {
           refetchTasks();
           setIsAddingTask(false);
           setEditingTask(null);
+          return { success: true };
         } else {
           alert('Failed to create task: ' + response.error);
+          return { success: false, error: response.error };
         }
       }
     } catch (error: any) {
       alert('Failed to save task: ' + (error?.response?.data?.error || error.message));
+      return { success: false, error: error?.response?.data?.error || error.message };
     }
   };
 
@@ -289,8 +313,8 @@ export default function TaskManagementPage() {
   // Filter tasks based on search and filter
   const filteredTasks = tasks.filter(task => {
     const matchesSearch = task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         task.assignee.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         task.project.toLowerCase().includes(searchTerm.toLowerCase());
+                         (task.assignee || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (task.project || '').toLowerCase().includes(searchTerm.toLowerCase());
     
     if (selectedFilter === 'all') return matchesSearch;
     return matchesSearch && task.status.toLowerCase().replace(' ', '') === selectedFilter;
@@ -475,9 +499,9 @@ export default function TaskManagementPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-sm font-medium text-primary-600 mr-2">
-                          {task.assignee.split(' ').map(n => n[0]).join('')}
+                          {(task.assignee || 'Unassigned').split(' ').map(n => n[0]).join('')}
                         </div>
-                        <span className="text-sm text-gray-900">{task.assignee}</span>
+                        <span className="text-sm text-gray-900">{task.assignee || 'Unassigned'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -931,7 +955,7 @@ export default function TaskManagementPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Remaining:</span>
-                      <span className="font-medium">{selectedTask.estimatedHours - selectedTask.actualHours}h</span>
+                      <span className="font-medium">{(selectedTask.estimatedHours || 0) - (selectedTask.actualHours || 0)}h</span>
                     </div>
                   </div>
                 </div>
@@ -948,7 +972,7 @@ export default function TaskManagementPage() {
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Tags</h3>
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {selectedTask.tags.map((tag, index) => (
+                    {(selectedTask.tags || []).map((tag, index) => (
                       <span key={index} className="inline-flex px-2 py-1 text-xs font-medium bg-primary-100 text-primary-800 rounded-full">
                         {tag}
                       </span>

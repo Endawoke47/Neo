@@ -3,8 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import MainLayout from '../../components/layout/MainLayout';
 import { FileText, Plus, Search, Download, Upload, Edit3, Trash2, Eye, CheckCircle, AlertTriangle, BarChart3, Calendar, Brain, TrendingUp, Clock, DollarSign, Loader2 } from 'lucide-react';
-import { useContracts, useCreateContract, useAnalyzeContract } from '../../hooks/useApi';
+import { useContracts, useCreateContract, useAnalyzeContract, useContractStats, useClients } from '../../hooks/useApi';
+import { useAuth } from '../../providers/auth-provider';
+import { useDebouncedSearch } from '../../hooks/useDebounced';
 import { ContractService, Contract as APIContract } from '../../services/api.service';
+import SearchAndFilter from '../../components/ui/SearchAndFilter';
+import LoadingSkeleton from '../../components/ui/LoadingSkeleton';
+import EmptyState from '../../components/ui/EmptyState';
+import ErrorState from '../../components/ui/ErrorState';
 
 // Extended Contract interface that includes UI-specific fields
 interface Contract extends APIContract {
@@ -21,6 +27,7 @@ export default function ContractManagementPage() {
   const [isAddingContract, setIsAddingContract] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [sortBy, setSortBy] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -44,28 +51,45 @@ export default function ContractManagementPage() {
   const { createContract, loading: createLoading, error: createError } = useCreateContract();
   const { analyzeContract, loading: analysisLoading, error: analysisError } = useAnalyzeContract();
 
-  // Transform API contracts to include UI-specific fields
-  const contracts: Contract[] = apiContracts.map(contract => ({
-    ...contract,
-    counterparty: contract.client?.name || contract.client?.companyName || 'Unknown Client',
-    riskScore: Math.floor(Math.random() * 100), // TODO: Get from AI analysis
-    compliance: Math.floor(Math.random() * 100), // TODO: Calculate from contract analysis
-    priority: ['High', 'Medium', 'Low'][Math.floor(Math.random() * 3)], // TODO: Determine from business rules
-    renewalDate: contract.endDate // Simplified for now
-  }));
+  // Get contract statistics with historical comparison
+  const { data: contractStatsData, loading: statsLoading, error: statsError } = useContractStats();
 
-  // Effect to refetch contracts when search/filter changes
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      updateParams({ 
-        search: searchTerm, 
-        status: selectedFilter === 'all' ? undefined : selectedFilter,
-        page: 1
-      });
-    }, 300); // Debounce search
+  // Get current user and clients for form state management
+  const { user } = useAuth();
+  const { data: clients = [] } = useClients({ limit: 100 }); // Get all clients for dropdown
 
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm, selectedFilter, updateParams]);
+  // Transform API contracts to include UI-specific fields with real AI analysis
+  const contracts: Contract[] = apiContracts.map(contract => {
+    // Extract AI analysis results
+    const latestAnalysis = contract.aiAnalyses?.[0];
+    let analysisData = { riskScore: 0, compliance: 85, priority: 'Medium' };
+    
+    if (latestAnalysis?.output) {
+      try {
+        const parsed = JSON.parse(latestAnalysis.output);
+        analysisData = {
+          riskScore: parsed.riskScore || parsed.risk_score || 0,
+          compliance: parsed.compliance || parsed.compliance_score || 85,
+          priority: parsed.priority || parsed.risk_level || 'Medium'
+        };
+      } catch (error) {
+        // Keep default values if parsing fails
+        console.warn('Failed to parse AI analysis output:', error);
+      }
+    }
+    
+    return {
+      ...contract,
+      counterparty: contract.client?.name || 'Unknown Client',
+      riskScore: analysisData.riskScore,
+      compliance: analysisData.compliance,
+      priority: analysisData.priority,
+      renewalDate: contract.endDate
+    };
+  });
+
+  // Universal debounced search with 300ms delay
+  useDebouncedSearch(searchTerm, selectedFilter, updateParams);
 
   // Handlers for full functionality
   const handleAddContract = () => {
@@ -172,6 +196,20 @@ export default function ContractManagementPage() {
           alert('Failed to update contract: ' + response.error);
         }
       } else {
+        // Validate required fields
+        const clientId = selectedClientId || contractData.clientId;
+        const assignedLawyerId = user?.id || contractData.assignedLawyerId;
+        
+        if (!clientId) {
+          alert('Please select a client for this contract.');
+          return;
+        }
+        
+        if (!assignedLawyerId) {
+          alert('Unable to determine assigned lawyer. Please ensure you are logged in.');
+          return;
+        }
+        
         // Create new contract - need to map UI fields to API fields
         const apiData = {
           title: contractData.title,
@@ -183,8 +221,8 @@ export default function ContractManagementPage() {
           startDate: contractData.startDate,
           endDate: contractData.endDate,
           autoRenewal: contractData.autoRenewal || false,
-          clientId: 'default-client-id', // TODO: Get from form
-          assignedLawyerId: 'default-lawyer-id' // TODO: Get from form or current user
+          clientId,
+          assignedLawyerId
         };
         
         const result = await createContract(apiData);
@@ -201,41 +239,44 @@ export default function ContractManagementPage() {
     }
   };
 
-  // Calculate stats from real data
+  // Calculate stats from real API data with historical comparison
   const stats = [
     { 
       label: 'Total Contracts', 
-      value: pagination?.total?.toString() || '0', 
-      change: '+' + Math.floor(Math.random() * 20), 
+      value: contractStatsData?.summary?.total?.toString() || pagination?.total?.toString() || '0', 
+      change: contractStatsData?.changes?.total || '0%',
       icon: FileText, 
       color: 'text-primary-600' 
     },
     { 
       label: 'Active Contracts', 
-      value: contracts?.filter(c => c.status === 'Active')?.length?.toString() || '0', 
-      change: '+' + Math.floor(Math.random() * 15), 
+      value: contractStatsData?.summary?.active?.toString() || contracts?.filter(c => c.status === 'APPROVED' || c.status === 'EXECUTED')?.length?.toString() || '0', 
+      change: contractStatsData?.changes?.active || '0%',
       icon: CheckCircle, 
       color: 'text-green-600' 
     },
     { 
       label: 'Total Value', 
-      value: contracts?.length > 0 ? 
-        '$' + (contracts.reduce((sum, c) => sum + (c.value || 0), 0) / 1000000).toFixed(1) + 'M' : 
-        '$0', 
-      change: '+' + Math.floor(Math.random() * 12) + '%', 
+      value: contractStatsData?.summary?.totalValue ? 
+        '$' + (contractStatsData.summary.totalValue / 1000000).toFixed(1) + 'M' : 
+        (contracts?.length > 0 ? 
+          '$' + (contracts.reduce((sum, c) => sum + (c.value || 0), 0) / 1000000).toFixed(1) + 'M' : 
+          '$0'), 
+      change: contractStatsData?.changes?.totalValue || '0%',
       icon: DollarSign, 
       color: 'text-purple-600' 
     },
     { 
       label: 'Expiring Soon', 
-      value: contracts?.filter(c => {
-        if (!c.endDate) return false;
-        const endDate = new Date(c.endDate);
-        const thirtyDaysFromNow = new Date();
-        thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
-        return endDate <= thirtyDaysFromNow && endDate >= new Date();
-      })?.length?.toString() || '0', 
-      change: '+' + Math.floor(Math.random() * 5), 
+      value: contractStatsData?.summary?.expiringSoon?.toString() || 
+        contracts?.filter(c => {
+          if (!c.endDate) return false;
+          const endDate = new Date(c.endDate);
+          const thirtyDaysFromNow = new Date();
+          thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
+          return endDate <= thirtyDaysFromNow && endDate >= new Date();
+        })?.length?.toString() || '0', 
+      change: contractStatsData?.changes?.expiring || '0%',
       icon: Clock, 
       color: 'text-orange-600' 
     }
@@ -318,22 +359,11 @@ export default function ContractManagementPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {contractsLoading ? (
-            // Loading state for stats
-            Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200 animate-pulse">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-lg bg-gray-200 w-12 h-12"></div>
-                  <div className="ml-4 flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-20 mb-2"></div>
-                    <div className="h-6 bg-gray-200 rounded w-16"></div>
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            stats.map((stat, index) => (
+        {(contractsLoading || statsLoading) ? (
+          <LoadingSkeleton type="stats" className="mb-8" />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {stats.map((stat, index) => (
               <div key={index} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                 <div className="flex items-center">
                   <div className={`p-3 rounded-lg ${stat.color} bg-opacity-10`}>
@@ -348,41 +378,29 @@ export default function ContractManagementPage() {
                   </div>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Search and Filters */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Search contracts..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="sm:w-48">
-              <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                value={selectedFilter}
-                onChange={(e) => setSelectedFilter(e.target.value)}
-              >
-                <option value="all">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="draft">Draft</option>
-                <option value="underreview">Under Review</option>
-                <option value="expired">Expired</option>
-                <option value="terminated">Terminated</option>
-              </select>
-            </div>
-          </div>
-        </div>
+        <SearchAndFilter
+          searchValue={searchTerm}
+          onSearchChange={setSearchTerm}
+          searchPlaceholder="Search contracts..."
+          filterValue={selectedFilter}
+          onFilterChange={setSelectedFilter}
+          filterOptions={[
+            { value: 'all', label: 'All Statuses' },
+            { value: 'active', label: 'Active' },
+            { value: 'draft', label: 'Draft' },
+            { value: 'underreview', label: 'Under Review' },
+            { value: 'expired', label: 'Expired' },
+            { value: 'terminated', label: 'Terminated' }
+          ]}
+          filterLabel="Status Filter"
+          disabled={contractsLoading}
+          className="mb-6"
+        />
 
         {/* Contracts Table */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -390,43 +408,27 @@ export default function ContractManagementPage() {
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-medium text-gray-900">Contract Overview</h3>
               {contractsError && (
-                <div className="text-sm text-red-600">Error: {contractsError}</div>
+                <ErrorState 
+                  message={contractsError} 
+                  onRetry={() => refetchContracts()} 
+                  className="w-auto"
+                />
               )}
             </div>
           </div>
           <div className="overflow-x-auto">
             {contractsLoading ? (
-              // Loading state for table
-              <div className="p-6">
-                <div className="animate-pulse space-y-4">
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <div key={index} className="flex space-x-4">
-                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                      <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <LoadingSkeleton type="table" className="p-6" />
             ) : filteredContracts.length === 0 ? (
-              // Empty state
-              <div className="p-8 text-center">
-                <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No contracts found</h3>
-                <p className="text-gray-600 mb-4">
-                  {searchTerm || selectedFilter !== 'all' ? 
-                    'No contracts match your current filters.' : 
-                    'Get started by creating your first contract.'}
-                </p>
-                <button
-                  onClick={handleAddContract}
-                  className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Contract
-                </button>
-              </div>
+              <EmptyState
+                icon={FileText}
+                title="No contracts found"
+                description={searchTerm || selectedFilter !== 'all' ? 
+                  'No contracts match your current filters.' : 
+                  'Get started by creating your first contract.'}
+                actionLabel="Add Contract"
+                onAction={handleAddContract}
+              />
             ) : (
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">

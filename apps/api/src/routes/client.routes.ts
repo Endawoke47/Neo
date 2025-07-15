@@ -64,11 +64,20 @@ router.post('/', async (req: AuthenticatedRequest, res) => {
   }
 });
 
-// GET /api/v1/clients/stats - Get client statistics
+// GET /api/v1/clients/stats - Get client statistics with optional date range for comparisons
 router.get('/stats', async (req: AuthenticatedRequest, res) => {
   try {
     const userId = req.user!.id;
-    const stats = await ClientService.getClientStats(userId);
+    const { startDate, endDate, compareStartDate, compareEndDate } = req.query;
+    
+    const options = {
+      startDate: startDate ? new Date(startDate as string) : undefined,
+      endDate: endDate ? new Date(endDate as string) : undefined,
+      compareStartDate: compareStartDate ? new Date(compareStartDate as string) : undefined,
+      compareEndDate: compareEndDate ? new Date(compareEndDate as string) : undefined,
+    };
+    
+    const stats = await ClientService.getClientStatsWithComparison(userId, options);
     
     res.json({
       success: true,
@@ -245,6 +254,35 @@ router.delete('/:id', async (req: AuthenticatedRequest, res) => {
     res.status(400).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to delete client'
+    });
+  }
+});
+
+// POST /api/v1/clients/bulk - Bulk import clients
+router.post('/bulk', async (req: AuthenticatedRequest, res) => {
+  try {
+    const { clients } = req.body;
+    
+    if (!Array.isArray(clients) || clients.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Clients array is required and must not be empty'
+      });
+    }
+    
+    const userId = req.user!.id;
+    const result = await ClientService.bulkCreateClients(clients, userId);
+    
+    res.status(201).json({
+      success: true,
+      data: result,
+      message: `Successfully imported ${result.successful.length} clients. ${result.failed.length} failed.`
+    });
+  } catch (error) {
+    console.error('Error in POST /clients/bulk:', error);
+    res.status(400).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to bulk import clients'
     });
   }
 });

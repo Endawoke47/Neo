@@ -3,16 +3,78 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { z, ZodSchema, ZodError } from 'zod';
+import { logger } from '../config/logger';
 
-// Generic validation middleware factory
+// Helper function to recursively sanitize request objects
+const sanitizeRequestObject = (obj: any): any => {
+  if (obj === null || obj === undefined) return obj;
+  
+  if (typeof obj === 'string') {
+    return sanitizeString(obj);
+  }
+  
+  if (typeof obj === 'number') {
+    return isFinite(obj) ? obj : 0;
+  }
+  
+  if (typeof obj === 'boolean') {
+    return obj;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeRequestObject(item));
+  }
+  
+  if (typeof obj === 'object') {
+    const sanitized: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      const sanitizedKey = sanitizeString(key);
+      if (sanitizedKey) {
+        sanitized[sanitizedKey] = sanitizeRequestObject(value);
+      }
+    }
+    return sanitized;
+  }
+  
+  return obj;
+};
+
+// Generic validation middleware factory with enhanced security
 export const validate = (schema: ZodSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Check rate limiting for validation attempts
+      const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
+      if (!checkValidationRateLimit(clientIp)) {
+        return res.status(429).json({
+          success: false,
+          error: 'Too many validation attempts',
+          message: 'Please slow down your requests'
+        });
+      }
+      
+      // Pre-sanitize request body before validation
+      if (req.body && typeof req.body === 'object') {
+        req.body = sanitizeRequestObject(req.body);
+      }
+      
       // Validate request body
       req.body = schema.parse(req.body);
       next();
     } catch (error) {
       if (error instanceof ZodError) {
+        // Log validation failures for security monitoring
+        logger.warn('Validation failed', {
+          ip: req.ip,
+          userAgent: req.get('User-Agent'),
+          path: req.path,
+          method: req.method,
+          errors: error.errors.map(err => ({
+            field: err.path.join('.'),
+            code: err.code
+          }))
+        });
+        
         return res.status(400).json({
           success: false,
           error: 'Validation error',
@@ -28,10 +90,15 @@ export const validate = (schema: ZodSchema) => {
   };
 };
 
-// Validate query parameters
+// Validate query parameters with sanitization
 export const validateQuery = (schema: ZodSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Pre-sanitize query parameters
+      if (req.query && typeof req.query === 'object') {
+        req.query = sanitizeRequestObject(req.query);
+      }
+      
       req.query = schema.parse(req.query);
       next();
     } catch (error) {
@@ -51,10 +118,15 @@ export const validateQuery = (schema: ZodSchema) => {
   };
 };
 
-// Validate route parameters
+// Validate route parameters with sanitization
 export const validateParams = (schema: ZodSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Pre-sanitize route parameters
+      if (req.params && typeof req.params === 'object') {
+        req.params = sanitizeRequestObject(req.params);
+      }
+      
       req.params = schema.parse(req.params);
       next();
     } catch (error) {
@@ -367,15 +439,115 @@ export const validateDate = (date: string): boolean => {
   return !isNaN(parsedDate.getTime());
 };
 
-// Sanitization helpers
+// Enhanced sanitization helpers with SQL injection and XSS protection
+import DOMPurify from 'isomorphic-dompurify';
+
 export const sanitizeString = (str: string): string => {
-  return str.trim().replace(/[<>\"'&]/g, '');
+  if (!str || typeof str !== 'string') return '';
+  
+  // Remove dangerous characters for SQL injection and XSS
+  return str
+    .trim()
+    .replace(/[<>"'&\x00\x08\x09\x1a\n\r"'\\%]/g, '')
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .substring(0, 10000); // Prevent excessively long strings
+};
+
+export const sanitizeHtml = (html: string): string => {
+  if (!html || typeof html !== 'string') return '';
+  
+  // Use DOMPurify to clean HTML content
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'ul', 'ol', 'li'],
+    ALLOWED_ATTR: [],
+    FORBID_SCRIPT: true,
+    FORBID_TAGS: ['script', 'object', 'embed', 'iframe', 'form']
+  });
 };
 
 export const sanitizeEmail = (email: string): string => {
-  return email.toLowerCase().trim();
+  if (!email || typeof email !== 'string') return '';
+  
+  return email
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9@._-]/g, '') // Only allow valid email characters
+    .substring(0, 254); // RFC 5321 email length limit
 };
 
 export const sanitizePhoneNumber = (phone: string): string => {
-  return phone.replace(/[^\d+]/g, '');
+  if (!phone || typeof phone !== 'string') return '';
+  
+  return phone
+    .replace(/[^\d+()\s-]/g, '') // Allow only digits, +, (, ), space, -
+    .trim()
+    .substring(0, 20); // Reasonable phone number length
 };
+
+export const sanitizeFileName = (filename: string): string => {
+  if (!filename || typeof filename !== 'string') return '';
+  
+  return filename
+    .replace(/[^a-zA-Z0-9._-]/g, '') // Only allow safe filename characters
+    .replace(/\.{2,}/g, '.') // Prevent directory traversal
+    .substring(0, 255); // File system limit
+};
+
+export const sanitizeSearchQuery = (query: string): string => {
+  if (!query || typeof query !== 'string') return '';
+  
+  return query
+    .trim()
+    .replace(/[<>"'&%\x00-\x1f\x7f-\x9f]/g, '') // Remove control characters and dangerous chars
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .substring(0, 500); // Reasonable search query length
+};
+
+export const sanitizeNumericInput = (input: string | number): number | null => {
+  if (typeof input === 'number') {
+    return isFinite(input) ? input : null;
+  }
+  
+  if (typeof input === 'string') {
+    const parsed = parseFloat(input.replace(/[^0-9.-]/g, ''));
+    return isFinite(parsed) ? parsed : null;
+  }
+  
+  return null;
+};
+
+// Rate limiting for validation attempts
+const validationAttempts = new Map<string, { count: number; lastAttempt: number }>();
+
+export const checkValidationRateLimit = (ip: string): boolean => {
+  const now = Date.now();
+  const windowMs = 60000; // 1 minute
+  const maxAttempts = 100; // Maximum validation attempts per window
+  
+  const attempts = validationAttempts.get(ip);
+  
+  if (!attempts || now - attempts.lastAttempt > windowMs) {
+    validationAttempts.set(ip, { count: 1, lastAttempt: now });
+    return true;
+  }
+  
+  if (attempts.count >= maxAttempts) {
+    return false;
+  }
+  
+  attempts.count++;
+  attempts.lastAttempt = now;
+  return true;
+};
+
+// Clean up old rate limit entries periodically
+setInterval(() => {
+  const now = Date.now();
+  const windowMs = 60000;
+  
+  for (const [ip, attempts] of validationAttempts.entries()) {
+    if (now - attempts.lastAttempt > windowMs) {
+      validationAttempts.delete(ip);
+    }
+  }
+}, 300000); // Clean up every 5 minutes

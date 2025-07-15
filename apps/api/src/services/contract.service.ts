@@ -186,6 +186,23 @@ export class ContractService {
               take: 3,
               orderBy: { createdAt: 'desc' }
             },
+            aiAnalyses: {
+              select: {
+                id: true,
+                type: true,
+                status: true,
+                output: true,
+                confidence: true,
+                completedAt: true
+              },
+              where: {
+                status: 'COMPLETED'
+              },
+              orderBy: {
+                completedAt: 'desc'
+              },
+              take: 1 // Get the latest analysis
+            },
             _count: {
               select: {
                 documents: true,
@@ -283,6 +300,8 @@ export class ContractService {
               type: true,
               confidence: true,
               status: true,
+              output: true,
+              completedAt: true,
               createdAt: true
             },
             orderBy: { createdAt: 'desc' },
@@ -560,6 +579,161 @@ export class ContractService {
     } catch (error) {
       console.error('Error searching contracts:', error);
       throw new Error(`Failed to search contracts: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  static async getContractStatsWithComparison(userId: string, options: {
+    startDate?: Date;
+    endDate?: Date;
+    compareStartDate?: Date;
+    compareEndDate?: Date;
+  } = {}) {
+    try {
+      const baseWhereClause = {
+        OR: [
+          { assignedLawyerId: userId },
+          { assignedLawyer: { role: { in: ['ADMIN', 'PARTNER'] } } }
+        ]
+      };
+
+      // Calculate default periods (current month vs previous month)
+      const now = new Date();
+      const currentMonthStart = options.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+      const currentMonthEnd = options.endDate || new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const previousMonthStart = options.compareStartDate || new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const previousMonthEnd = options.compareEndDate || new Date(now.getFullYear(), now.getMonth(), 0);
+
+      // Current period stats
+      const currentPeriodWhere = {
+        ...baseWhereClause,
+        createdAt: {
+          gte: currentMonthStart,
+          lte: currentMonthEnd
+        }
+      };
+
+      // Previous period stats
+      const previousPeriodWhere = {
+        ...baseWhereClause,
+        createdAt: {
+          gte: previousMonthStart,
+          lte: previousMonthEnd
+        }
+      };
+
+      const [
+        // Current period
+        currentTotal,
+        currentActive,
+        currentTotalValue,
+        currentExpiring,
+        
+        // Previous period
+        previousTotal,
+        previousActive,
+        previousTotalValue,
+        previousExpiring,
+        
+        // Overall stats
+        totalContracts,
+        activeContracts,
+        totalValue,
+        expiringSoon,
+        contractsByType,
+        contractsByStatus
+      ] = await Promise.all([
+        // Current period stats
+        prisma.contract.count({ where: currentPeriodWhere }),
+        prisma.contract.count({ where: { ...currentPeriodWhere, status: 'ACTIVE' } }),
+        prisma.contract.aggregate({ 
+          where: currentPeriodWhere, 
+          _sum: { value: true } 
+        }),
+        prisma.contract.count({ 
+          where: { 
+            ...currentPeriodWhere, 
+            endDate: { lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }
+          } 
+        }),
+        
+        // Previous period stats
+        prisma.contract.count({ where: previousPeriodWhere }),
+        prisma.contract.count({ where: { ...previousPeriodWhere, status: 'ACTIVE' } }),
+        prisma.contract.aggregate({ 
+          where: previousPeriodWhere, 
+          _sum: { value: true } 
+        }),
+        prisma.contract.count({ 
+          where: { 
+            ...previousPeriodWhere, 
+            endDate: { lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) }
+          } 
+        }),
+        
+        // Overall stats
+        prisma.contract.count({ where: baseWhereClause }),
+        prisma.contract.count({ where: { ...baseWhereClause, status: 'ACTIVE' } }),
+        prisma.contract.aggregate({ 
+          where: baseWhereClause, 
+          _sum: { value: true } 
+        }),
+        prisma.contract.count({ 
+          where: { 
+            ...baseWhereClause, 
+            endDate: { 
+              lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+              gte: new Date()
+            }
+          } 
+        }),
+        
+        // Contracts by type
+        prisma.contract.groupBy({
+          by: ['type'],
+          where: baseWhereClause,
+          _count: { type: true }
+        }),
+        
+        // Contracts by status
+        prisma.contract.groupBy({
+          by: ['status'],
+          where: baseWhereClause,
+          _count: { status: true }
+        })
+      ]);
+
+      // Calculate percentage changes
+      const calculateChange = (current: number, previous: number): string => {
+        if (previous === 0) return current > 0 ? '+100%' : '0%';
+        const change = ((current - previous) / previous) * 100;
+        return `${change >= 0 ? '+' : ''}${Math.round(change)}%`;
+      };
+
+      return {
+        summary: {
+          total: totalContracts,
+          active: activeContracts,
+          totalValue: totalValue._sum.value || 0,
+          expiringSoon
+        },
+        changes: {
+          total: calculateChange(currentTotal, previousTotal),
+          active: calculateChange(currentActive, previousActive),
+          totalValue: calculateChange(currentTotalValue._sum.value || 0, previousTotalValue._sum.value || 0),
+          expiring: calculateChange(currentExpiring, previousExpiring)
+        },
+        byType: contractsByType.map(item => ({
+          type: item.type,
+          count: item._count.type
+        })),
+        byStatus: contractsByStatus.map(item => ({
+          status: item.status,
+          count: item._count.status
+        }))
+      };
+    } catch (error) {
+      console.error('Error fetching contract stats with comparison:', error);
+      throw new Error(`Failed to fetch contract statistics: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }

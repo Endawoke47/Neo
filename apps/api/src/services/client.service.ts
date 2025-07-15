@@ -529,6 +529,249 @@ export class ClientService {
     }
   }
 
+  static async getClientStatsWithComparison(userId: string, options: {
+    startDate?: Date;
+    endDate?: Date;
+    compareStartDate?: Date;
+    compareEndDate?: Date;
+  } = {}) {
+    try {
+      const baseWhereClause = {
+        OR: [
+          { assignedLawyerId: userId },
+          { assignedLawyer: { role: { in: ['ADMIN', 'PARTNER'] } } }
+        ]
+      };
+
+      // Calculate default periods (current month vs previous month)
+      const now = new Date();
+      const currentMonthStart = options.startDate || new Date(now.getFullYear(), now.getMonth(), 1);
+      const currentMonthEnd = options.endDate || new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const previousMonthStart = options.compareStartDate || new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const previousMonthEnd = options.compareEndDate || new Date(now.getFullYear(), now.getMonth(), 0);
+
+      // Current period stats
+      const currentPeriodWhere = {
+        ...baseWhereClause,
+        createdAt: {
+          gte: currentMonthStart,
+          lte: currentMonthEnd
+        }
+      };
+
+      // Previous period stats
+      const previousPeriodWhere = {
+        ...baseWhereClause,
+        createdAt: {
+          gte: previousMonthStart,
+          lte: previousMonthEnd
+        }
+      };
+
+      const [
+        // Current period
+        currentTotal,
+        currentActive,
+        currentNewClients,
+        currentInactive,
+        
+        // Previous period
+        previousTotal,
+        previousActive,
+        previousNewClients,
+        previousInactive,
+        
+        // Overall stats
+        totalClients,
+        activeClients,
+        prospectClients,
+        inactiveClients,
+        clientsByType,
+        clientsByIndustry,
+        recentActivity
+      ] = await Promise.all([
+        // Current period stats
+        prisma.client.count({ where: currentPeriodWhere }),
+        prisma.client.count({ where: { ...currentPeriodWhere, status: 'ACTIVE' } }),
+        prisma.client.count({ where: currentPeriodWhere }),
+        prisma.client.count({ where: { ...currentPeriodWhere, status: 'INACTIVE' } }),
+        
+        // Previous period stats
+        prisma.client.count({ where: previousPeriodWhere }),
+        prisma.client.count({ where: { ...previousPeriodWhere, status: 'ACTIVE' } }),
+        prisma.client.count({ where: previousPeriodWhere }),
+        prisma.client.count({ where: { ...previousPeriodWhere, status: 'INACTIVE' } }),
+        
+        // Overall stats
+        prisma.client.count({ where: baseWhereClause }),
+        prisma.client.count({ where: { ...baseWhereClause, status: 'ACTIVE' } }),
+        prisma.client.count({ where: { ...baseWhereClause, status: 'PROSPECT' } }),
+        prisma.client.count({ where: { ...baseWhereClause, status: 'INACTIVE' } }),
+        
+        // Clients by type
+        prisma.client.groupBy({
+          by: ['clientType'],
+          where: baseWhereClause,
+          _count: { clientType: true }
+        }),
+        
+        // Clients by industry
+        prisma.client.groupBy({
+          by: ['industry'],
+          where: { ...baseWhereClause, industry: { not: null } },
+          _count: { industry: true },
+          orderBy: { _count: { industry: 'desc' } },
+          take: 10
+        }),
+        
+        // Recent activity
+        prisma.client.findMany({
+          where: baseWhereClause,
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            clientType: true,
+            createdAt: true,
+            updatedAt: true,
+            assignedLawyer: {
+              select: {
+                firstName: true,
+                lastName: true
+              }
+            }
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: 5
+        })
+      ]);
+
+      // Calculate percentage changes
+      const calculateChange = (current: number, previous: number): string => {
+        if (previous === 0) return current > 0 ? '+100%' : '0%';
+        const change = ((current - previous) / previous) * 100;
+        return `${change >= 0 ? '+' : ''}${Math.round(change)}%`;
+      };
+
+      return {
+        summary: {
+          total: totalClients,
+          active: activeClients,
+          prospect: prospectClients,
+          inactive: inactiveClients,
+          newThisMonth: currentNewClients
+        },
+        changes: {
+          total: calculateChange(currentTotal, previousTotal),
+          active: calculateChange(currentActive, previousActive),
+          newClients: calculateChange(currentNewClients, previousNewClients),
+          inactive: calculateChange(currentInactive, previousInactive)
+        },
+        byType: clientsByType.map(item => ({
+          type: item.clientType,
+          count: item._count.clientType
+        })),
+        byIndustry: clientsByIndustry.map(item => ({
+          industry: item.industry,
+          count: item._count.industry
+        })),
+        recentActivity: recentActivity.map(client => ({
+          name: client.name,
+          type: client.clientType,
+          assignedLawyer: client.assignedLawyer ? 
+            `${client.assignedLawyer.firstName} ${client.assignedLawyer.lastName}` : 
+            'Unassigned',
+          status: client.status,
+          createdDate: client.createdAt.toISOString().split('T')[0]
+        }))
+      };
+    } catch (error) {
+      console.error('Error fetching client stats with comparison:', error);
+      throw new Error(`Failed to fetch client statistics: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  static async bulkCreateClients(clientsData: CreateClientDTO[], userId: string) {
+    try {
+      const successful: any[] = [];
+      const failed: any[] = [];
+
+      for (let i = 0; i < clientsData.length; i++) {
+        try {
+          const clientData = clientsData[i];
+          
+          // Validate required fields
+          if (!clientData.name || !clientData.email) {
+            failed.push({
+              row: i + 1,
+              data: clientData,
+              error: 'Name and email are required'
+            });
+            continue;
+          }
+
+          // Check if client with same email already exists
+          const existingClient = await prisma.client.findUnique({
+            where: { email: clientData.email }
+          });
+
+          if (existingClient) {
+            failed.push({
+              row: i + 1,
+              data: clientData,
+              error: 'Client with this email already exists'
+            });
+            continue;
+          }
+
+          // Create client
+          const client = await prisma.client.create({
+            data: {
+              ...clientData,
+              assignedLawyerId: clientData.assignedLawyerId || userId,
+              status: 'ACTIVE'
+            },
+            include: {
+              assignedLawyer: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                  role: true
+                }
+              }
+            }
+          });
+
+          successful.push({
+            row: i + 1,
+            client
+          });
+        } catch (error) {
+          failed.push({
+            row: i + 1,
+            data: clientsData[i],
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      return {
+        successful,
+        failed,
+        summary: {
+          total: clientsData.length,
+          successful: successful.length,
+          failed: failed.length
+        }
+      };
+    } catch (error) {
+      console.error('Error in bulk client creation:', error);
+      throw new Error(`Failed to bulk create clients: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   static async searchClients(query: string, userId: string, limit: number = 10) {
     try {
       const clients = await prisma.client.findMany({

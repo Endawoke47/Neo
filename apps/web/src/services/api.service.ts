@@ -88,8 +88,22 @@ export interface Contract {
   client?: Client;
   assignedLawyerId: string;
   assignedLawyer?: User;
+  aiAnalyses?: AIAnalysisResult[];
+  _count?: {
+    documents: number;
+    aiAnalyses: number;
+  };
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AIAnalysisResult {
+  id: string;
+  type: string;
+  status: string;
+  output?: string;
+  confidence?: number;
+  completedAt?: string;
 }
 
 export interface Document {
@@ -323,6 +337,27 @@ export class ClientService {
     const response = await apiClient.delete(`/clients/${id}`);
     return response.data;
   }
+
+  static async getClientStatsWithComparison(options?: {
+    startDate?: Date;
+    endDate?: Date;
+    compareStartDate?: Date;
+    compareEndDate?: Date;
+  }): Promise<ApiResponse<any>> {
+    const params: any = {};
+    if (options?.startDate) params.startDate = options.startDate.toISOString();
+    if (options?.endDate) params.endDate = options.endDate.toISOString();
+    if (options?.compareStartDate) params.compareStartDate = options.compareStartDate.toISOString();
+    if (options?.compareEndDate) params.compareEndDate = options.compareEndDate.toISOString();
+    
+    const response = await apiClient.get('/clients/stats', { params });
+    return response.data;
+  }
+
+  static async bulkImportClients(clients: any[]): Promise<ApiResponse<any>> {
+    const response = await apiClient.post('/clients/bulk', { clients });
+    return response.data;
+  }
 }
 
 // Matter Service
@@ -416,6 +451,22 @@ export class ContractService {
 
   static async deleteContract(id: string): Promise<ApiResponse> {
     const response = await apiClient.delete(`/contracts/${id}`);
+    return response.data;
+  }
+
+  static async getContractStatsWithComparison(options?: {
+    startDate?: Date;
+    endDate?: Date;
+    compareStartDate?: Date;
+    compareEndDate?: Date;
+  }): Promise<ApiResponse<any>> {
+    const params: any = {};
+    if (options?.startDate) params.startDate = options.startDate.toISOString();
+    if (options?.endDate) params.endDate = options.endDate.toISOString();
+    if (options?.compareStartDate) params.compareStartDate = options.compareStartDate.toISOString();
+    if (options?.compareEndDate) params.compareEndDate = options.compareEndDate.toISOString();
+    
+    const response = await apiClient.get('/contracts/stats', { params });
     return response.data;
   }
 }

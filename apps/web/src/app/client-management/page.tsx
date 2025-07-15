@@ -3,9 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import MainLayout from '../../components/layout/MainLayout';
 import { Users, Plus, Search, Download, Upload, Edit3, Trash2, Eye, CheckCircle, AlertTriangle, BarChart3, Calendar, FileText, Building2, TrendingUp, Clock, Loader2, Mail, Phone, MapPin } from 'lucide-react';
-import { useClients, useCreateClient } from '../../hooks/useApi';
+import { useClients, useCreateClient, useClientStats } from '../../hooks/useApi';
+import { useDebouncedSearch } from '../../hooks/useDebounced';
 import { ClientService, Client as APIClient } from '../../services/api.service';
 import ClientFormModal from '../../components/modals/ClientFormModal';
+import FileImportModal from '../../components/ui/FileImportModal';
+import SearchAndFilter from '../../components/ui/SearchAndFilter';
+import LoadingSkeleton from '../../components/ui/LoadingSkeleton';
+import EmptyState from '../../components/ui/EmptyState';
+import ErrorState from '../../components/ui/ErrorState';
 
 // Extended Client interface that includes UI-specific fields
 interface Client extends APIClient {
@@ -36,6 +42,9 @@ export default function ClientManagementPage() {
   });
   
   const { createClient, loading: createLoading, error: createError } = useCreateClient();
+  
+  // Get real client statistics with historical comparison
+  const { data: clientStatsData, loading: statsLoading, error: statsError } = useClientStats();
 
   // Transform API clients to include UI-specific fields
   const clients: Client[] = apiClients.map(client => ({
@@ -46,19 +55,17 @@ export default function ClientManagementPage() {
   const [isAddingClient, setIsAddingClient] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
 
-  // Effect to refetch clients when search/filter changes
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      updateParams({ 
-        search: searchTerm, 
-        clientType: selectedFilter === 'all' ? undefined : selectedFilter,
-        page: 1
-      });
-    }, 300); // Debounce search
-
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm, selectedFilter, updateParams]);
+  // Universal debounced search with 300ms delay
+  useDebouncedSearch(searchTerm, selectedFilter, (params) => {
+    updateParams({
+      ...params,
+      clientType: params.status === 'all' ? undefined : params.status,
+      page: params.page
+    });
+  });
 
   // Handlers for functionality
   const handleAddClient = () => {
@@ -90,41 +97,86 @@ export default function ClientManagementPage() {
   };
 
   const handleExport = () => {
-    const csvContent = [
-      ['ID', 'Name', 'Email', 'Phone', 'Client Type', 'Industry', 'Assigned Lawyer', 'Status', 'Created Date'],
-      ...clients.map(c => [
-        c.id, 
-        c.name, 
-        c.email, 
-        c.phone || '', 
-        c.clientType, 
-        c.industry || '', 
-        c.assignedLawyer ? `${c.assignedLawyer.firstName} ${c.assignedLawyer.lastName}` : 'Unassigned',
-        c.isActive ? 'Active' : 'Inactive',
-        c.createdAt?.split('T')[0] || ''
-      ])
-    ].map(row => row.join(',')).join('\n');
+    // Show export options
+    const exportFormat = confirm('Click OK for Excel (.xlsx) or Cancel for CSV format');
+    
+    const headers = ['ID', 'Name', 'Email', 'Phone', 'Client Type', 'Industry', 'Assigned Lawyer', 'Status', 'Created Date'];
+    const data = clients.map(c => [
+      c.id, 
+      c.name, 
+      c.email, 
+      c.phone || '', 
+      c.clientType, 
+      c.industry || '', 
+      c.assignedLawyer ? `${c.assignedLawyer.firstName} ${c.assignedLawyer.lastName}` : 'Unassigned',
+      c.isActive ? 'Active' : 'Inactive',
+      c.createdAt?.split('T')[0] || ''
+    ]);
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'clients.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    if (exportFormat) {
+      // Export as XLSX
+      import('xlsx').then(XLSX => {
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Clients');
+        
+        // Auto-size columns
+        const maxWidth = headers.map((header, i) => {
+          const maxLength = Math.max(
+            header.length,
+            ...data.map(row => (row[i] || '').toString().length)
+          );
+          return { wch: Math.min(maxLength + 2, 50) };
+        });
+        ws['!cols'] = maxWidth;
+        
+        XLSX.writeFile(wb, `clients_export_${new Date().toISOString().split('T')[0]}.xlsx`);
+      });
+    } else {
+      // Export as CSV
+      const csvContent = [headers, ...data]
+        .map(row => row.map(cell => `"${(cell || '').toString().replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `clients_export_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
   };
 
   const handleImport = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.csv,.xlsx';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        alert('Client import functionality implemented - File selected: ' + file.name);
-      }
-    };
-    input.click();
+    setIsImportModalOpen(true);
+  };
+
+  const handleBulkImport = async (clientsData: any[]) => {
+    setImportLoading(true);
+    try {
+      // Transform the data to match our expected format
+      const transformedClients = clientsData.map(row => ({
+        name: row.name || row.Name,
+        email: row.email || row.Email,
+        phoneNumber: row.phone || row.phoneNumber || row.Phone,
+        address: row.address || row.Address,
+        clientType: row.clientType || row['Client Type'] || 'INDIVIDUAL',
+        industry: row.industry || row.Industry,
+        description: row.description || row.Description || row.notes
+      }));
+
+      const result = await ClientService.bulkImportClients(transformedClients);
+      
+      // Refresh the client list
+      refetchClients();
+      
+      return result.data;
+    } catch (error) {
+      throw error;
+    } finally {
+      setImportLoading(false);
+    }
   };
 
   const handleSaveClient = async (clientData: any) => {
@@ -169,58 +221,61 @@ export default function ClientManagementPage() {
   const stats = [
     { 
       label: 'Total Clients', 
-      value: pagination?.total?.toString() || '0', 
-      change: '+' + Math.floor(Math.random() * 15), // TODO: Calculate from historical data
+      value: clientStatsData?.summary?.total?.toString() || pagination?.total?.toString() || '0', 
+      change: clientStatsData?.changes?.total || '0%',
       icon: Users, 
       color: 'text-primary-600' 
     },
     { 
       label: 'Active Clients', 
-      value: clients.filter(c => c.isActive).length.toString(), 
-      change: '+' + Math.floor(Math.random() * 8), // TODO: Calculate from historical data
+      value: clientStatsData?.summary?.active?.toString() || clients.filter(c => c.isActive).length.toString(), 
+      change: clientStatsData?.changes?.active || '0%',
       icon: CheckCircle, 
       color: 'text-green-600' 
     },
     { 
       label: 'New This Month', 
-      value: clients.filter(c => {
+      value: clientStatsData?.summary?.newThisMonth?.toString() || clients.filter(c => {
         const createdDate = new Date(c.createdAt);
         const currentDate = new Date();
         return createdDate.getMonth() === currentDate.getMonth() && 
                createdDate.getFullYear() === currentDate.getFullYear();
       }).length.toString(), 
-      change: '+' + Math.floor(Math.random() * 12), // TODO: Calculate from historical data
+      change: clientStatsData?.changes?.newClients || '0%',
       icon: TrendingUp, 
       color: 'text-blue-600' 
     },
     { 
       label: 'Inactive Clients', 
-      value: clients.filter(c => !c.isActive).length.toString(), 
-      change: '-' + Math.floor(Math.random() * 3), // TODO: Calculate from historical data
+      value: clientStatsData?.summary?.inactive?.toString() || clients.filter(c => !c.isActive).length.toString(), 
+      change: clientStatsData?.changes?.inactive || '0%',
       icon: AlertTriangle, 
       color: 'text-orange-600' 
     }
   ];
 
-  // Calculate client type distribution from real data
-  const clientTypeStats = clients.reduce((acc, client) => {
+  // Calculate client type distribution from real data (prioritize API stats)
+  const clientTypeStats = clientStatsData?.byType?.reduce((acc: Record<string, number>, item: any) => {
+    acc[item.type] = item.count;
+    return acc;
+  }, {}) || clients.reduce((acc, client) => {
     const type = client.clientType || 'Other';
     acc[type] = (acc[type] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
-  const totalClients = clients.length;
+  const totalClientTypes = Object.values(clientTypeStats).reduce((sum: number, count: unknown) => sum + (count as number), 0);
   const colors = ['bg-primary-500', 'bg-green-500', 'bg-blue-500', 'bg-purple-500', 'bg-yellow-500', 'bg-red-500'];
   
   const clientTypes = Object.entries(clientTypeStats).map(([type, count], index) => ({
     type,
-    count,
-    percentage: totalClients > 0 ? Math.round((count / totalClients) * 100) : 0,
+    count: count as number,
+    percentage: (totalClientTypes as number) > 0 ? Math.round(((count as number) / (totalClientTypes as number)) * 100) : 0,
     color: colors[index % colors.length]
   }));
 
-  // Recent client activities from real data
-  const recentClients = clients
+  // Recent client activities from real data (prioritize API stats)
+  const recentClients = clientStatsData?.recentActivity || clients
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5)
     .map(client => ({
@@ -378,7 +433,7 @@ export default function ClientManagementPage() {
               <Calendar className="h-5 w-5 text-gray-400" />
             </div>
             <div className="space-y-4">
-              {recentClients.map((client, index) => (
+              {recentClients.map((client: any, index: number) => (
                 <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex items-center space-x-3">
                     <div className="flex-shrink-0">
@@ -397,7 +452,7 @@ export default function ClientManagementPage() {
                     }`}>
                       {client.status}
                     </span>
-                    <p className="text-xs text-gray-500 mt-1">{client.createdDate}</p>
+                    <p className="text-xs text-gray-500 mt-1">{client.createdDate || 'N/A'}</p>
                   </div>
                 </div>
               ))}
@@ -409,31 +464,27 @@ export default function ClientManagementPage() {
         <div className="bg-white rounded-lg shadow-corporate mb-6 border border-gray-200">
           <div className="p-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-              <div className="flex-1 max-w-lg">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search clients..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  />
-                </div>
+              <div className="flex-1">
+                <SearchAndFilter
+                  searchValue={searchTerm}
+                  onSearchChange={setSearchTerm}
+                  searchPlaceholder="Search clients..."
+                  filterValue={selectedFilter}
+                  onFilterChange={setSelectedFilter}
+                  filterOptions={[
+                    { value: 'all', label: 'All Types' },
+                    { value: 'Individual', label: 'Individual' },
+                    { value: 'Corporation', label: 'Corporation' },
+                    { value: 'Small Business', label: 'Small Business' },
+                    { value: 'Enterprise', label: 'Enterprise' },
+                    { value: 'Non-Profit', label: 'Non-Profit' }
+                  ]}
+                  filterLabel="Client Type Filter"
+                  disabled={clientsLoading}
+                  className="max-w-4xl"
+                />
               </div>
-              <div className="flex space-x-4">
-                <select
-                  value={selectedFilter}
-                  onChange={(e) => setSelectedFilter(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                >
-                  <option value="all">All Types</option>
-                  <option value="Individual">Individual</option>
-                  <option value="Corporation">Corporation</option>
-                  <option value="Small Business">Small Business</option>
-                  <option value="Enterprise">Enterprise</option>
-                  <option value="Non-Profit">Non-Profit</option>
-                </select>
+              <div className="sm:ml-4">
                 <select
                   value={`${sortBy}-${sortOrder}`}
                   onChange={(e) => {
@@ -442,6 +493,7 @@ export default function ClientManagementPage() {
                     setSortOrder(order);
                   }}
                   className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  disabled={clientsLoading}
                 >
                   <option value="-desc">Sort by...</option>
                   <option value="name-asc">Name (A-Z)</option>
@@ -624,6 +676,37 @@ export default function ClientManagementPage() {
         onSave={handleSaveClient}
         client={editingClient}
         isLoading={createLoading}
+      />
+
+      {/* File Import Modal */}
+      <FileImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onImport={handleBulkImport}
+        title="Import Clients"
+        acceptedFileTypes={['.csv', '.xlsx', '.xls']}
+        sampleHeaders={['name', 'email', 'phone', 'address', 'clientType', 'industry', 'description']}
+        templateData={[
+          {
+            name: 'John Doe',
+            email: 'john.doe@example.com',
+            phone: '(555) 123-4567',
+            address: '123 Main St, City, State 12345',
+            clientType: 'INDIVIDUAL',
+            industry: 'Technology',
+            description: 'Sample client description'
+          },
+          {
+            name: 'Acme Corporation',
+            email: 'contact@acme.com',
+            phone: '(555) 987-6543',
+            address: '456 Business Blvd, City, State 67890',
+            clientType: 'CORPORATION',
+            industry: 'Manufacturing',
+            description: 'Large manufacturing company'
+          }
+        ]}
+        isLoading={importLoading}
       />
     </div>
     </MainLayout>

@@ -37,13 +37,54 @@ const envSchema = z.object({
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000), // 15 minutes
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(100),
   
+  // AI Provider Configuration
+  OPENAI_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  GOOGLE_API_KEY: z.string().optional(),
+  OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434'),
+  
+  // AI Provider Settings
+  DEFAULT_AI_PROVIDER: z.enum(['openai', 'anthropic', 'google', 'ollama']).default('openai'),
+  AI_MAX_TOKENS: z.coerce.number().default(4000),
+  AI_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.7),
+  AI_REQUEST_TIMEOUT: z.coerce.number().default(30000), // 30 seconds
+  
+  // Cache Configuration
+  REDIS_URL: z.string().optional(),
+  CACHE_TTL: z.coerce.number().default(300), // 5 minutes
+  ENABLE_CACHING: z.coerce.boolean().default(true),
+  
+  // File Upload Configuration
+  MAX_FILE_SIZE: z.coerce.number().default(10485760), // 10MB
+  ALLOWED_FILE_TYPES: z.string().default('pdf,doc,docx,txt,rtf'),
+  UPLOAD_PATH: z.string().default('./uploads'),
+  
+  // Security Headers
+  ENABLE_CORS: z.coerce.boolean().default(true),
+  CORS_ORIGIN: z.string().default('http://localhost:3000'),
+  ENABLE_HELMET: z.coerce.boolean().default(true),
+  ENABLE_COMPRESSION: z.coerce.boolean().default(true),
+  
+  // Database Configuration
+  DB_POOL_SIZE: z.coerce.number().default(10),
+  DB_CONNECTION_TIMEOUT: z.coerce.number().default(5000),
+  DB_QUERY_TIMEOUT: z.coerce.number().default(10000),
+  
+  // Monitoring & Health Check
+  HEALTH_CHECK_INTERVAL: z.coerce.number().default(30000), // 30 seconds
+  ENABLE_METRICS: z.coerce.boolean().default(true),
+  METRICS_PORT: z.coerce.number().default(9090),
+  
   // Features
   ENABLE_REGISTRATION: z.coerce.boolean().default(true),
   ENABLE_PASSWORD_RESET: z.coerce.boolean().default(true),
+  ENABLE_AUDIT_LOGGING: z.coerce.boolean().default(true),
+  ENABLE_API_DOCS: z.coerce.boolean().default(true),
   
   // Logging
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   ENABLE_REQUEST_LOGGING: z.coerce.boolean().default(true),
+  LOG_RETENTION_DAYS: z.coerce.number().default(30),
 });
 
 // Parse and validate environment variables
