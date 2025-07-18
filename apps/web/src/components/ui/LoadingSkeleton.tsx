@@ -8,7 +8,7 @@ interface LoadingSkeletonProps {
   className?: string;
 }
 
-export default function LoadingSkeleton({ 
+export function LoadingSkeleton({ 
   type = 'table', 
   rows = 5, 
   className = "" 
@@ -69,3 +69,5 @@ export default function LoadingSkeleton({
     </div>
   );
 }
+
+export default LoadingSkeleton;

@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AuthProvider } from './auth-provider';
 import { AIProvider } from './ai-provider';
+import { CommandPaletteProvider } from './command-palette-provider';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -25,8 +26,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <AIProvider>
-          {children}
-          <ReactQueryDevtools initialIsOpen={false} />
+          <CommandPaletteProvider>
+            {children}
+            <ReactQueryDevtools initialIsOpen={false} />
+          </CommandPaletteProvider>
         </AIProvider>
       </AuthProvider>
     </QueryClientProvider>

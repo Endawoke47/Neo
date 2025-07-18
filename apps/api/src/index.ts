@@ -1,4 +1,5 @@
-// Enhanced API Server Entry Point with Production-Grade Security
+// Enhanced API Server Entry Point - A+++++ Architecture
+// Command & Policy Pattern with Production-Grade Security
 // User: Endawoke47
 // Date: 2025-07-15 21:00:00 UTC
 
@@ -9,6 +10,11 @@ import dotenv from 'dotenv';
 
 // Load environment variables FIRST
 dotenv.config();
+
+// A+++++ Architecture Core
+import { commandRegistry } from './core/command-registry';
+import { policyService } from './core/policy.service';
+import { dbService } from './config/database';
 
 import swaggerUi from 'swagger-ui-express';
 import { logger, securityLogger, perfLogger } from './config/logger';
@@ -118,7 +124,7 @@ app.get('/api-docs.json', (_, res) => {
   res.send(swaggerSpec);
 });
 
-// Enhanced health check endpoint with system metrics
+// Enhanced health check endpoint with A+++++ Architecture metrics
 app.get('/health', asyncHandler(async (req, res) => {
   const healthTimer = perfLogger.time('health_check');
   
@@ -127,12 +133,25 @@ app.get('/health', asyncHandler(async (req, res) => {
     const memoryUsage = process.memoryUsage();
     const cpuUsage = process.cpuUsage();
     
+    // A+++++ Architecture status
+    const dbHealthy = await dbService.healthCheck();
+    const commandsRegistered = commandRegistry.isRegistered();
+    const policyStats = policyService.getStats();
+    
     const healthData = {
-      status: 'OK',
+      status: dbHealthy && commandsRegistered ? 'OK' : 'DEGRADED',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: env.NODE_ENV,
       version: process.env.npm_package_version || '1.0.0',
+      architecture: {
+        type: 'Command & Policy Pattern',
+        database: dbHealthy,
+        commandBus: commandsRegistered,
+        policyService: policyStats.rulesCount > 0,
+        registeredCommands: commandRegistry.getRegisteredCommands().length,
+        policyRules: policyStats.rulesCount
+      },
       memory: {
         used: Math.round(memoryUsage.heapUsed / 1024 / 1024),
         total: Math.round(memoryUsage.heapTotal / 1024 / 1024),
@@ -150,10 +169,11 @@ app.get('/health', asyncHandler(async (req, res) => {
       ip: req.ip,
       duration: healthTimer.end(),
       memory: healthData.memory,
-      uptime: healthData.uptime
+      uptime: healthData.uptime,
+      architecture: healthData.architecture
     });
     
-    res.status(200).json(healthData);
+    res.status(healthData.status === 'OK' ? 200 : 503).json(healthData);
   } catch (error) {
     logger.error('Health check failed', { error: (error as Error).message });
     res.status(503).json({
@@ -210,60 +230,99 @@ app.use('/api/v1/document-automation', documentAutomationRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Start server with enhanced startup logging
-const server = app.listen(PORT, () => {
-  const duration = serverStart.end();
-  
-  logger.info('🚀 CounselFlow API Server Started', {
-    port: PORT,
-    environment: env.NODE_ENV,
-    version: process.env.npm_package_version || '1.0.0',
-    startupTime: `${duration}ms`,
-    healthCheck: `http://localhost:${PORT}/health`,
-    apiDocs: env.ENABLE_API_DOCS ? `http://localhost:${PORT}/api-docs` : 'disabled',
-    metrics: env.ENABLE_METRICS ? `http://localhost:${PORT}/metrics` : 'disabled',
-    nodeVersion: process.version,
-    platform: process.platform,
-    arch: process.arch
-  });
-  
-  // Log security configuration status
-  securityLogger.dataAccess('system', 'server_startup', 'startup');
+// Initialize A+++++ Architecture and start server
+async function initializeAndStart(): Promise<void> {
+  try {
+    logger.info('🏗️ Initializing A+++++ Architecture...');
+    
+    // 1. Connect to database
+    await dbService.connect();
+    
+    // 2. Register all command handlers
+    commandRegistry.registerAllHandlers();
+    
+    // 3. Initialize policy service (already done in constructor)
+    const policyStats = policyService.getStats();
+    logger.info('Policy service initialized', policyStats);
+    
+    logger.info('✅ A+++++ Architecture initialized successfully');
+    
+    // Start server
+    const server = app.listen(PORT, () => {
+      const duration = serverStart.end();
+      
+      logger.info('🚀 CounselFlow API Server Started with A+++++ Architecture', {
+        port: PORT,
+        environment: env.NODE_ENV,
+        version: process.env.npm_package_version || '1.0.0',
+        architecture: 'Command & Policy Pattern',
+        startupTime: `${duration}ms`,
+        commandsRegistered: commandRegistry.getRegisteredCommands().length,
+        policyRules: policyStats.rulesCount,
+        healthCheck: `http://localhost:${PORT}/health`,
+        apiDocs: env.ENABLE_API_DOCS ? `http://localhost:${PORT}/api-docs` : 'disabled',
+        metrics: env.ENABLE_METRICS ? `http://localhost:${PORT}/metrics` : 'disabled',
+        nodeVersion: process.version,
+        platform: process.platform,
+        arch: process.arch
+      });
+      
+      // Log security configuration status
+      securityLogger.dataAccess('system', 'server_startup', 'startup');
+    });
+    
+    return server;
+  } catch (error) {
+    logger.error('❌ Failed to initialize A+++++ Architecture', { error });
+    process.exit(1);
+  }
+}
+
+// Initialize and start
+let server: any;
+initializeAndStart().then((s) => {
+  server = s;
+  // Server timeout configuration
+  server.timeout = 30000; // 30 seconds
+  server.keepAliveTimeout = 65000; // 65 seconds
+  server.headersTimeout = 66000; // 66 seconds
+}).catch((error) => {
+  logger.error('Failed to start server', { error });
+  process.exit(1);
 });
 
-// Server timeout configuration
-server.timeout = 30000; // 30 seconds
-server.keepAliveTimeout = 65000; // 65 seconds
-server.headersTimeout = 66000; // 66 seconds
-
-// Enhanced graceful shutdown handling
-const gracefulShutdown = (signal: string) => {
+// Enhanced graceful shutdown handling with A+++++ Architecture cleanup
+const gracefulShutdown = async (signal: string) => {
   logger.info(`${signal} received, initiating graceful shutdown`);
   
   const shutdownTimer = perfLogger.time('server_shutdown');
   
-  server.close((err) => {
-    if (err) {
-      logger.error('Error during server shutdown', { error: err.message });
-      process.exit(1);
+  try {
+    // Close server first
+    if (server) {
+      await new Promise<void>((resolve, reject) => {
+        server.close((err: any) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
     }
     
-    logger.info('Server closed successfully', {
+    // Cleanup A+++++ Architecture components
+    await dbService.disconnect();
+    commandRegistry.clearRegistrations();
+    policyService.clearCache();
+    
+    logger.info('Graceful shutdown completed', {
       shutdownTime: shutdownTimer.end(),
       signal
     });
     
-    // Close database connections, clear caches, etc.
-    // Add cleanup logic here
-    
     process.exit(0);
-  });
-  
-  // Force shutdown after 10 seconds
-  setTimeout(() => {
-    logger.error('Forced shutdown due to timeout');
+  } catch (error) {
+    logger.error('Error during graceful shutdown', { error });
     process.exit(1);
-  }, 10000);
+  }
 };
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

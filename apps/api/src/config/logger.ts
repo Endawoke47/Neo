@@ -129,14 +129,15 @@ export const perfLogger = {
   }
 };
 
-// Security event logger
+// Enhanced security event logger with correlation tracking
 export const securityLogger = {
-  authFailure: (email: string, ip: string, reason: string) => {
+  authFailure: (email: string, ip: string, reason: string, correlationId?: string) => {
     logger.warn('Authentication failure', {
       event: 'auth_failure',
       email: email.replace(/(.{2}).*(.{2})@/, '$1***$2@'), // Partially mask email
       ip,
       reason,
+      correlationId,
       timestamp: new Date().toISOString()
     });
   },
@@ -151,13 +152,34 @@ export const securityLogger = {
     });
   },
   
-  dataAccess: (userId: string, resource: string, action: string) => {
+  dataAccess: (userId: string, resource: string, action: string, correlationId?: string) => {
     logger.info('Data access event', {
       event: 'data_access',
       userId,
       resource,
       action,
+      correlationId,
       timestamp: new Date().toISOString()
+    });
+  },
+
+  loginAttempt: (userId: string, success: boolean, details?: any) => {
+    logger.info('Login attempt', {
+      event: 'login_attempt',
+      userId,
+      success,
+      timestamp: new Date().toISOString(),
+      ...details
+    });
+  },
+
+  privilegedAction: (userId: string, action: string, details?: any) => {
+    logger.warn('Privileged action performed', {
+      event: 'privileged_action',
+      userId,
+      action,
+      timestamp: new Date().toISOString(),
+      ...details
     });
   }
 };

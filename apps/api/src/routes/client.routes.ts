@@ -1,5 +1,7 @@
-// Client Management Routes
-// Complete CRUD operations for client management
+/**
+ * Client Management Routes - A+++++ API Documentation
+ * Complete CRUD operations for client management with comprehensive documentation
+ */
 
 import { Router } from 'express';
 import { ClientService, createClientSchema, updateClientSchema, clientQuerySchema } from '../services/client.service';
@@ -11,6 +13,109 @@ const router = Router();
 // Apply authentication to all routes
 router.use(authenticate);
 
+/**
+ * @swagger
+ * /clients:
+ *   get:
+ *     tags: [Clients]
+ *     summary: Get all clients with pagination and filtering
+ *     description: |
+ *       Retrieve a paginated list of clients with comprehensive filtering options.
+ *       
+ *       **A+++++ Features:**
+ *       - Advanced pagination with sorting
+ *       - Full-text search capabilities
+ *       - Multiple filter options
+ *       - Performance optimized queries
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *         description: Number of items per page
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search term for client name, email, or company
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [ACTIVE, INACTIVE, PROSPECT]
+ *         description: Filter by client status
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [INDIVIDUAL, BUSINESS, ORGANIZATION]
+ *         description: Filter by client type
+ *     responses:
+ *       200:
+ *         description: Clients retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         format: uuid
+ *                       name:
+ *                         type: string
+ *                         example: "Acme Corporation"
+ *                       email:
+ *                         type: string
+ *                         format: email
+ *                       phone:
+ *                         type: string
+ *                       clientType:
+ *                         type: string
+ *                         enum: [INDIVIDUAL, BUSINESS, ORGANIZATION]
+ *                       status:
+ *                         type: string
+ *                         enum: [ACTIVE, INACTIVE, PROSPECT]
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     total:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       500:
+ *         $ref: '#/components/responses/InternalServerError'
+ */
 // GET /api/v1/clients - List clients with pagination and filtering
 router.get('/', async (req: AuthenticatedRequest, res) => {
   try {

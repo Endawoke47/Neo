@@ -1,0 +1,188 @@
+# A+++++ Prometheus Alerting Rules
+# Advanced monitoring rules for CounselFlow A+++++ architecture
+
+groups:
+  - name: counselflow-api-alerts
+    interval: 30s
+    rules:
+      # High Error Rate Alert
+      - alert: HighAPIErrorRate
+        expr: (rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          service: api
+        annotations:
+          summary: "High API error rate detected"
+          description: "API error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+      # A+++++ Command Bus Performance Alert
+      - alert: SlowCommandExecution
+        expr: histogram_quantile(0.95, rate(command_execution_duration_seconds_bucket[5m])) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+          component: command-bus
+        annotations:
+          summary: "Slow command execution detected"
+          description: "95th percentile command execution time is {{ $value }}s"
+
+      # Policy Service Cache Performance
+      - alert: LowPolicyCacheHitRate
+        expr: (rate(policy_cache_hits_total[5m]) / rate(policy_evaluations_total[5m])) < 0.7
+        for: 10m
+        labels:
+          severity: warning
+          component: policy-service
+        annotations:
+          summary: "Low policy cache hit rate"
+          description: "Policy cache hit rate is {{ $value | humanizePercentage }}"
+
+      # Circuit Breaker Alert
+      - alert: CircuitBreakerOpen
+        expr: circuit_breaker_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          component: circuit-breaker
+        annotations:
+          summary: "Circuit breaker is open"
+          description: "Circuit breaker for {{ $labels.service }} is open"
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: (process_resident_memory_bytes / node_memory_MemTotal_bytes) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value | humanizePercentage }}"
+
+      # Database Connection Issues
+      - alert: DatabaseConnectionIssues
+        expr: database_connections_active / database_connections_max > 0.8
+        for: 2m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "High database connection usage"
+          description: "Database connection usage is {{ $value | humanizePercentage }}"
+
+  - name: counselflow-infrastructure-alerts
+    interval: 30s
+    rules:
+      # Container Down Alert
+      - alert: ContainerDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container is down"
+          description: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 1 minute"
+
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: (100 - (avg(irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}%"
+
+      # High Disk Usage
+      - alert: HighDiskUsage
+        expr: (node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage detected"
+          description: "Disk usage is {{ $value | humanizePercentage }}"
+
+      # Redis Connection Issues
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis instance is not responding"
+
+  - name: counselflow-business-alerts
+    interval: 60s
+    rules:
+      # AI Service Performance
+      - alert: SlowAIResponse
+        expr: histogram_quantile(0.95, rate(ai_request_duration_seconds_bucket[10m])) > 30
+        for: 5m
+        labels:
+          severity: warning
+          component: ai-service
+        annotations:
+          summary: "Slow AI service response"
+          description: "95th percentile AI response time is {{ $value }}s"
+
+      # Legal Research Performance
+      - alert: HighLegalResearchFailureRate
+        expr: (rate(legal_research_requests_total{status="failed"}[5m]) / rate(legal_research_requests_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: legal-research
+        annotations:
+          summary: "High legal research failure rate"
+          description: "Legal research failure rate is {{ $value | humanizePercentage }}"
+
+      # Document Processing Issues
+      - alert: DocumentProcessingBacklog
+        expr: document_processing_queue_size > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: document-processing
+        annotations:
+          summary: "Document processing backlog detected"
+          description: "{{ $value }} documents are waiting to be processed"
+
+  - name: counselflow-security-alerts
+    interval: 30s
+    rules:
+      # Unusual Request Volume
+      - alert: HighRequestVolume
+        expr: rate(http_requests_total[5m]) > 1000
+        for: 2m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "Unusually high request volume"
+          description: "Request rate is {{ $value }} requests/second"
+
+      # Failed Authentication Attempts
+      - alert: HighFailedAuthRate
+        expr: rate(auth_attempts_total{status="failed"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          component: authentication
+        annotations:
+          summary: "High failed authentication rate"
+          description: "Failed authentication rate is {{ $value }} attempts/second"
+
+      # Rate Limit Violations
+      - alert: RateLimitViolations
+        expr: rate(rate_limit_violations_total[5m]) > 5
+        for: 1m
+        labels:
+          severity: warning
+          component: rate-limiting
+        annotations:
+          summary: "Rate limit violations detected"
+          description: "Rate limit violation rate is {{ $value }} violations/second"

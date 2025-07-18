@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -47,6 +47,12 @@ model User {
   passwordResets      PasswordReset[]
   auditLogs           AuditLog[]
   
+  // Performance Indexes
+  @@index([email])
+  @@index([role, isActive])
+  @@index([createdAt])
+  @@index([lastLoginAt])
+  @@index([firm, role])
   @@map("users")
 }
 
@@ -120,6 +126,12 @@ model Client {
   disputes        Dispute[]
   documents       Document[]
 
+  // Performance Indexes
+  @@index([email])
+  @@index([assignedLawyerId, isActive])
+  @@index([clientType, isActive])
+  @@index([createdAt])
+  @@index([name])
   @@map("clients")
 }
 
@@ -147,6 +159,12 @@ model Contract {
   documents         Document[]
   aiAnalyses        AIAnalysis[]
 
+  // Performance Indexes
+  @@index([status, assignedLawyerId])
+  @@index([clientId, status])
+  @@index([type, status])
+  @@index([endDate, status])
+  @@index([createdAt])
   @@map("contracts")
 }
 
@@ -175,6 +193,13 @@ model Matter {
   riskAssessments   Risk[]
   aiAnalyses        AIAnalysis[]
 
+  // Performance Indexes
+  @@index([status, assignedLawyerId])
+  @@index([clientId, status])
+  @@index([type, status])
+  @@index([priority, status])
+  @@index([statute_of_limitations])
+  @@index([createdAt])
   @@map("matters")
 }
 
@@ -323,5 +348,12 @@ model AIAnalysis {
   document        Document?       @relation(fields: [documentId], references: [id])
   documentId      String?
 
+  // Performance Indexes
+  @@index([type, status])
+  @@index([requestedById, createdAt])
+  @@index([status, createdAt])
+  @@index([contractId])
+  @@index([matterId])
+  @@index([documentId])
   @@map("ai_analyses")
 }

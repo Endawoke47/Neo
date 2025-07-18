@@ -5,7 +5,7 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { AppProviders } from '../providers/app-providers';
-import { Toaster } from 'react-hot-toast';
+import { CommandPaletteIndicator } from '../components/ui/CommandPaletteIndicator';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -64,7 +64,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <AppProviders>
           {children}
-          <Toaster position="top-right" />
+          <CommandPaletteIndicator />
         </AppProviders>
       </body>
     </html>

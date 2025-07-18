@@ -1,122 +1,148 @@
 /**
- * Environment Configuration for API
- * Manages environment variables with validation
+ * Environment Configuration and Validation
+ * Ensures all required environment variables are present and valid
  */
 
 import { z } from 'zod';
+import { logger } from './logger';
 
-// Environment schema
-const envSchema = z.object({
+// Environment validation schema
+const environmentSchema = z.object({
+  // Core application
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.coerce.number().default(8000),
+  PORT: z.string().transform(Number).default('8000'),
   
-  // Database
-  DATABASE_URL: z.string().min(1, 'Database URL is required'),
+  // Database (required)
+  DATABASE_URL: z.string().url('Invalid database URL'),
   
-  // JWT Configuration
-  JWT_SECRET: z.string().min(8, 'JWT secret must be at least 8 characters'),
-  JWT_REFRESH_SECRET: z.string().min(8, 'JWT refresh secret must be at least 8 characters'),
-  JWT_EXPIRES_IN: z.string().default('15m'),
-  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+  // JWT Secrets (required in production)
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
+  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
+  JWT_AUDIENCE: z.string().default('counselflow-api'),
+  JWT_ISSUER: z.string().default('counselflow'),
   
-  // Email Configuration (optional)
-  SMTP_HOST: z.string().optional(),
-  SMTP_PORT: z.coerce.number().optional(),
-  SMTP_USER: z.string().optional(),
-  SMTP_PASS: z.string().optional(),
-  EMAIL_FROM: z.string().default('CounselFlow <noreply@counselflow.com>'),
+  // Redis (optional but recommended for production)
+  REDIS_URL: z.string().url().optional(),
   
-  // Application URL
-  APP_URL: z.string().default('http://localhost:3000'),
-  
-  // Security
-  BCRYPT_SALT_ROUNDS: z.coerce.number().default(12),
-  PASSWORD_RESET_TOKEN_EXPIRES_IN: z.string().default('1h'),
-  
-  // Rate Limiting
-  RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000), // 15 minutes
-  RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(100),
-  
-  // AI Provider Configuration
+  // AI Services (optional)
   OPENAI_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
-  GOOGLE_API_KEY: z.string().optional(),
-  OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434'),
+  GOOGLE_AI_API_KEY: z.string().optional(),
   
-  // AI Provider Settings
-  DEFAULT_AI_PROVIDER: z.enum(['openai', 'anthropic', 'google', 'ollama']).default('openai'),
-  AI_MAX_TOKENS: z.coerce.number().default(4000),
-  AI_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.7),
-  AI_REQUEST_TIMEOUT: z.coerce.number().default(30000), // 30 seconds
+  // Email configuration (required for production)
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.string().transform(Number).optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
   
-  // Cache Configuration
-  REDIS_URL: z.string().optional(),
-  CACHE_TTL: z.coerce.number().default(300), // 5 minutes
-  ENABLE_CACHING: z.coerce.boolean().default(true),
+  // File storage
+  UPLOAD_MAX_SIZE: z.string().transform(Number).default('10485760'), // 10MB
+  UPLOAD_ALLOWED_TYPES: z.string().default('pdf,doc,docx,txt,rtf'),
   
-  // File Upload Configuration
-  MAX_FILE_SIZE: z.coerce.number().default(10485760), // 10MB
-  ALLOWED_FILE_TYPES: z.string().default('pdf,doc,docx,txt,rtf'),
-  UPLOAD_PATH: z.string().default('./uploads'),
+  // Security
+  CORS_ORIGIN: z.string().optional(),
+  RATE_LIMIT_WINDOW_MS: z.string().transform(Number).default('900000'), // 15 minutes
+  RATE_LIMIT_MAX_REQUESTS: z.string().transform(Number).default('100'),
   
-  // Security Headers
-  ENABLE_CORS: z.coerce.boolean().default(true),
-  CORS_ORIGIN: z.string().default('http://localhost:3000'),
-  ENABLE_HELMET: z.coerce.boolean().default(true),
-  ENABLE_COMPRESSION: z.coerce.boolean().default(true),
-  
-  // Database Configuration
-  DB_POOL_SIZE: z.coerce.number().default(10),
-  DB_CONNECTION_TIMEOUT: z.coerce.number().default(5000),
-  DB_QUERY_TIMEOUT: z.coerce.number().default(10000),
-  
-  // Monitoring & Health Check
-  HEALTH_CHECK_INTERVAL: z.coerce.number().default(30000), // 30 seconds
-  ENABLE_METRICS: z.coerce.boolean().default(true),
-  METRICS_PORT: z.coerce.number().default(9090),
-  
-  // Features
-  ENABLE_REGISTRATION: z.coerce.boolean().default(true),
-  ENABLE_PASSWORD_RESET: z.coerce.boolean().default(true),
-  ENABLE_AUDIT_LOGGING: z.coerce.boolean().default(true),
-  ENABLE_API_DOCS: z.coerce.boolean().default(true),
+  // Monitoring
+  HEALTH_CHECK_ENABLED: z.string().transform(Boolean).default('true'),
+  METRICS_ENABLED: z.string().transform(Boolean).default('true'),
   
   // Logging
-  LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
-  ENABLE_REQUEST_LOGGING: z.coerce.boolean().default(true),
-  LOG_RETENTION_DAYS: z.coerce.number().default(30),
+  LOG_LEVEL: z.string().default('info'),
+  LOG_RETENTION_DAYS: z.string().transform(Number).default('30'),
 });
 
-// Parse and validate environment variables
-function loadEnvironment() {
+// Environment validation result type
+export type Environment = z.infer<typeof environmentSchema>;
+
+// Validate environment variables
+export function validateEnvironment(): Environment {
   try {
-    return envSchema.parse(process.env);
+    const env = environmentSchema.parse(process.env);
+    
+    // Additional production validations
+    if (env.NODE_ENV === 'production') {
+      validateProductionRequirements(env);
+    }
+    
+    logger.info('Environment validation successful', {
+      nodeEnv: env.NODE_ENV,
+      port: env.PORT,
+      hasRedis: !!env.REDIS_URL,
+      hasOpenAI: !!env.OPENAI_API_KEY,
+      hasAnthropic: !!env.ANTHROPIC_API_KEY,
+    });
+    
+    return env;
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const missingVars = error.errors.map(err => 
-        `${err.path.join('.')}: ${err.message}`
+      const errors = error.errors.map(e => `${e.path.join('.')}: ${e.message}`);
+      logger.error('Environment validation failed', { errors });
+      
+      throw new Error(
+        'Environment validation failed:\n' + 
+        errors.map(e => `  - ${e}`).join('\n')
       );
-      
-      console.error('Environment validation failed:');
-      missingVars.forEach(msg => console.error(`  - ${msg}`));
-      
-      if (process.env.NODE_ENV === 'production') {
-        process.exit(1);
-      }
-      
-      // Return defaults for development
-      return envSchema.parse({
-        ...process.env,
-        DATABASE_URL: process.env.DATABASE_URL || 'sqlite:./dev.db',
-        JWT_SECRET: process.env.JWT_SECRET || 'dev-jwt-secret-key',
-        JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET || 'dev-refresh-secret-key',
-      });
     }
+    
     throw error;
   }
 }
 
-export const env = loadEnvironment();
+function validateProductionRequirements(env: Environment): void {
+  const requiredInProduction = [
+    { key: 'REDIS_URL', value: env.REDIS_URL },
+    { key: 'SMTP_HOST', value: env.SMTP_HOST },
+    { key: 'SMTP_USER', value: env.SMTP_USER },
+    { key: 'SMTP_PASSWORD', value: env.SMTP_PASSWORD },
+    { key: 'CORS_ORIGIN', value: env.CORS_ORIGIN },
+  ];
+  
+  const missing = requiredInProduction
+    .filter(req => !req.value)
+    .map(req => req.key);
+  
+  if (missing.length > 0) {
+    throw new Error(
+      `Production environment missing required variables: ${missing.join(', ')}`
+    );
+  }
+  
+  // Validate JWT secrets strength in production
+  if (env.JWT_SECRET.length < 64) {
+    logger.warn('JWT_SECRET should be at least 64 characters in production');
+  }
+  
+  if (env.JWT_REFRESH_SECRET.length < 64) {
+    logger.warn('JWT_REFRESH_SECRET should be at least 64 characters in production');
+  }
+  
+  // Validate secure origins
+  if (env.CORS_ORIGIN && !env.CORS_ORIGIN.startsWith('https://')) {
+    logger.warn('CORS_ORIGIN should use HTTPS in production');
+  }
+}
 
-// Export types
-export type Environment = z.infer<typeof envSchema>;
+// Export validated environment
+export const env = validateEnvironment();
+
+// Environment utilities
+export const isProduction = env.NODE_ENV === 'production';
+export const isDevelopment = env.NODE_ENV === 'development';
+export const isTest = env.NODE_ENV === 'test';
+
+// Feature flags based on environment
+export const features = {
+  ai: {
+    openai: !!env.OPENAI_API_KEY,
+    anthropic: !!env.ANTHROPIC_API_KEY,
+    google: !!env.GOOGLE_AI_API_KEY,
+  },
+  email: !!env.SMTP_HOST,
+  redis: !!env.REDIS_URL,
+  metrics: env.METRICS_ENABLED,
+  healthCheck: env.HEALTH_CHECK_ENABLED,
+};
+
+export default env;

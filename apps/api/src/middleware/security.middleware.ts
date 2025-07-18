@@ -74,6 +74,28 @@ export const uploadLimiter = createRateLimit(
   'File upload rate limit exceeded'
 );
 
+// Enhanced file upload security middleware
+import multer from 'multer';
+import path from 'path';
+import { enhancedFileValidation, InputValidator } from '../config/secrets';
+
+export const secureFileUpload = multer({
+  ...enhancedFileValidation,
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadPath = process.env.UPLOAD_PATH || './uploads';
+      cb(null, uploadPath);
+    },
+    filename: (req, file, cb) => {
+      const sanitizedName = InputValidator.sanitizeFilename(file.originalname);
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const ext = path.extname(sanitizedName);
+      const name = path.basename(sanitizedName, ext);
+      cb(null, `${name}-${uniqueSuffix}${ext}`);
+    }
+  })
+});
+
 // Password reset rate limiting
 export const passwordResetLimiter = createRateLimit(
   60 * 60 * 1000, // 1 hour
@@ -115,8 +137,14 @@ export const corsOptions = {
       'https://app.counselflow.com'
     ];
 
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
+    // Security Fix: Only allow requests without origin in development
+    if (!origin && process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    
+    if (!origin) {
+      return callback(new Error('Origin required'), false);
+    }
 
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
