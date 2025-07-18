@@ -98,7 +98,7 @@ const logger = winston.createLogger({
   defaultMeta: { 
     service: 'counselflow-api',
     environment: env.NODE_ENV,
-    version: process.env.npm_package_version || '1.0.0'
+    version: process.env['npm_package_version'] || '1.0.0'
   },
   transports,
   // Handle uncaught exceptions and unhandled rejections

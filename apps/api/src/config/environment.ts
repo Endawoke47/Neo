@@ -4,7 +4,6 @@
  */
 
 import { z } from 'zod';
-import { logger } from './logger';
 
 // Environment validation schema
 const environmentSchema = z.object({
@@ -51,6 +50,20 @@ const environmentSchema = z.object({
   // Logging
   LOG_LEVEL: z.string().default('info'),
   LOG_RETENTION_DAYS: z.string().transform(Number).default('30'),
+  ENABLE_REQUEST_LOGGING: z.string().transform(Boolean).default('true'),
+  
+  // Application URLs
+  APP_URL: z.string().url().default('http://localhost:3000'),
+  
+  // File upload settings
+  MAX_FILE_SIZE: z.string().transform(Number).default('10485760'),
+  ALLOWED_FILE_TYPES: z.string().default('pdf,doc,docx,txt,rtf'),
+  
+  // Authentication settings
+  PASSWORD_RESET_TOKEN_EXPIRES_IN: z.string().default('1h'),
+  
+  // Encryption
+  SECRETS_ENCRYPTION_KEY: z.string().min(32).optional(),
 });
 
 // Environment validation result type
@@ -66,7 +79,7 @@ export function validateEnvironment(): Environment {
       validateProductionRequirements(env);
     }
     
-    logger.info('Environment validation successful', {
+    console.log('Environment validation successful', {
       nodeEnv: env.NODE_ENV,
       port: env.PORT,
       hasRedis: !!env.REDIS_URL,
@@ -78,7 +91,7 @@ export function validateEnvironment(): Environment {
   } catch (error) {
     if (error instanceof z.ZodError) {
       const errors = error.errors.map(e => `${e.path.join('.')}: ${e.message}`);
-      logger.error('Environment validation failed', { errors });
+      console.error('Environment validation failed', { errors });
       
       throw new Error(
         'Environment validation failed:\n' + 
@@ -111,16 +124,16 @@ function validateProductionRequirements(env: Environment): void {
   
   // Validate JWT secrets strength in production
   if (env.JWT_SECRET.length < 64) {
-    logger.warn('JWT_SECRET should be at least 64 characters in production');
+    console.warn('JWT_SECRET should be at least 64 characters in production');
   }
   
   if (env.JWT_REFRESH_SECRET.length < 64) {
-    logger.warn('JWT_REFRESH_SECRET should be at least 64 characters in production');
+    console.warn('JWT_REFRESH_SECRET should be at least 64 characters in production');
   }
   
   // Validate secure origins
   if (env.CORS_ORIGIN && !env.CORS_ORIGIN.startsWith('https://')) {
-    logger.warn('CORS_ORIGIN should use HTTPS in production');
+    console.warn('CORS_ORIGIN should use HTTPS in production');
   }
 }
 
