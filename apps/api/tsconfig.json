@@ -2,18 +2,16 @@
   "compilerOptions": {
     "target": "ES2020",
     "module": "commonjs",
-    "lib": [
-      "ES2020"
-    ],
+    "lib": ["ES2020"],
     "declaration": true,
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "noPropertyAccessFromIndexSignature": true,
+    "noPropertyAccessFromIndexSignature": false,
     "moduleResolution": "node",
     "baseUrl": "./",
     "allowSyntheticDefaultImports": true,
@@ -21,7 +19,9 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true
   },
   "include": [
     "src/**/*"

@@ -3,6 +3,10 @@
  * Production-ready enterprise legal management platform
  */
 
+// Load environment variables first
+import * as dotenv from 'dotenv';
+dotenv.config();
+
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -139,8 +143,9 @@ process.on('uncaughtException', (error: Error) => {
 
 // Start server
 const PORT = env.PORT;
-const server = app.listen(PORT, () => {
-  logger.info(`🚀 CounselFlow Neo API server running on port ${PORT}`);
+const HOST = '0.0.0.0'; // Bind to all interfaces
+const server = app.listen(PORT, HOST, () => {
+  logger.info(`🚀 CounselFlow Neo API server running on http://${HOST}:${PORT}`);
   logger.info(`🌍 Environment: ${env.NODE_ENV}`);
   logger.info(`🔒 Security features enabled`);
   logger.info(`📊 Monitoring enabled: ${env.METRICS_ENABLED}`);

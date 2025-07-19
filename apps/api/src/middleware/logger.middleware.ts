@@ -30,7 +30,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
 
   // Override res.end to capture response details
   const originalEnd = res.end;
-  res.end = function(chunk?: any, encoding?: any, cb?: any) {
+  res.end = function(chunk?: any, encoding?: any, cb?: any): any {
     const duration = Date.now() - startTime;
     
     // Log response
@@ -45,6 +45,9 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       timestamp: new Date().toISOString(),
     });
 
+    // Call original end method and return
+    const result = originalEnd.call(this, chunk, encoding, cb);
+    
     // Log slow requests as warnings
     if (duration > 3000) {
       logger.warn('Slow request detected', {
@@ -70,8 +73,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       });
     }
 
-    // Call original end method
-    originalEnd.call(this, chunk, encoding, cb);
+    return result;
   };
 
   next();
@@ -95,7 +97,7 @@ export function secureRequestLogger(req: Request, res: Response, next: NextFunct
   });
 
   const originalEnd = res.end;
-  res.end = function(chunk?: any, encoding?: any, cb?: any) {
+  res.end = function(chunk?: any, encoding?: any, cb?: any): any {
     const duration = Date.now() - startTime;
     
     logger.info('Secure request completed', {

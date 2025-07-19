@@ -44,9 +44,8 @@ router.get('/deep', asyncHandler(async (req: Request, res: Response) => {
   const memUsagePercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
   checks.memory = {
     status: memUsagePercent > 90 ? 'unhealthy' : memUsagePercent > 70 ? 'warning' : 'healthy',
-    message: `Memory usage: ${memUsagePercent.toFixed(2)}%`,
-    usage: memUsage
-  };
+    message: `Memory usage: ${memUsagePercent.toFixed(2)}%`
+  } as any;
 
   // Overall health status
   const hasUnhealthy = Object.values(checks).some((check: any) => check.status === 'unhealthy');

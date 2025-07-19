@@ -272,35 +272,53 @@ router.post('/logout', asyncHandler(async (req: Request, res: Response) => {
  * Get current user info
  */
 router.get('/me', asyncHandler(async (req: Request, res: Response) => {
-  const userId = req.headers['x-user-id'] as string;
-
-  if (!userId) {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
     throw new UnauthorizedError('Authentication required');
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      email: true,
-      firstName: true,
-      lastName: true,
-      role: true,
-      status: true,
-      isEmailVerified: true,
-      lastLoginAt: true,
-      createdAt: true
+  const token = authHeader.substring(7);
+
+  try {
+    const decoded = jwt.verify(token, env.JWT_SECRET) as any;
+    
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        status: true,
+        isEmailVerified: true,
+        lastLoginAt: true,
+        createdAt: true
+      }
+    });
+
+    if (!user) {
+      throw new UnauthorizedError('User not found');
     }
-  });
 
-  if (!user) {
-    throw new UnauthorizedError('User not found');
+    if (user.status !== 'ACTIVE') {
+      throw new UnauthorizedError('User account is not active');
+    }
+
+    res.json({
+      success: true,
+      data: user
+    });
+  } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      throw new UnauthorizedError('Token expired');
+    } else if (error instanceof jwt.JsonWebTokenError) {
+      throw new UnauthorizedError('Invalid token');
+    } else {
+      throw new UnauthorizedError('Authentication failed');
+    }
   }
-
-  res.json({
-    success: true,
-    data: user
-  });
 }));
 
 /**

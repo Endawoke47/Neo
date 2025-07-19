@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Briefcase, Plus, Search, Download, Upload, Edit3, Trash2, Eye, CheckCircle, AlertTriangle, BarChart3, Calendar, Clock, DollarSign, Users, TrendingUp, Target, Loader2 } from 'lucide-react';
 import MainLayout from '../../components/layout/MainLayout';
 import { useMatters, useCreateMatter, useClients } from '../../hooks/useApi';

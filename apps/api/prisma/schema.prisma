@@ -1,12 +1,11 @@
-// This is your Prisma schema file
-// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+// CounselFlow Neo - Simplified Schema for SQLite Development
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -20,10 +19,9 @@ model User {
   phoneNumber                 String?
   
   // Account Status
-  role                        UserRole  @default(USER)
-  status                      UserStatus @default(ACTIVE)
+  role                        String    @default("USER")  // ADMIN, USER, GUEST
+  status                      String    @default("ACTIVE") // ACTIVE, PENDING_VERIFICATION, SUSPENDED, DEACTIVATED
   isEmailVerified             Boolean   @default(false)
-  isTwoFactorEnabled          Boolean   @default(false)
   
   // Profile Information
   bio                         String?
@@ -32,8 +30,6 @@ model User {
   profileImageUrl             String?
   
   // Security
-  twoFactorSecret             String?
-  twoFactorBackupCodes        Json?
   passwordResetToken          String?
   passwordResetExpires        DateTime?
   emailVerificationToken      String?
@@ -50,18 +46,10 @@ model User {
   
   // Relations
   sessions                    Session[]
-  apiKeys                     ApiKey[]
-  clients                     Client[]  @relation("AssignedLawyer")
-  matters                     Matter[]  @relation("AssignedLawyer")
-  contracts                   Contract[] @relation("AssignedLawyer")
-  documents                   Document[] @relation("UploadedBy")
-  risks                       Risk[]    @relation("IdentifiedBy")
-  risksAssessed               Risk[]    @relation("AssessedBy")
-  policies                    Policy[]  @relation("CreatedBy")
-  policiesApproved            Policy[]  @relation("ApprovedBy")
-  aiAnalyses                  AIAnalysis[]
-  rolePermissions             UserRolePermission[]
-  auditLogs                   AuditLog[]
+  clients                     Client[]
+  matters                     Matter[]
+  contracts                   Contract[]
+  documents                   Document[]
   
   @@map("users")
 }
@@ -71,7 +59,6 @@ model Session {
   userId            String
   ipAddress         String?
   userAgent         String?
-  deviceFingerprint String?
   isActive          Boolean   @default(true)
   expiresAt         DateTime
   lastActivityAt    DateTime  @default(now())
@@ -80,80 +67,6 @@ model Session {
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   @@map("sessions")
-}
-
-// Removed TempSession - not needed for simplified auth
-
-model ApiKey {
-  id          String    @id @default(cuid())
-  userId      String
-  name        String
-  key         String    @unique
-  isActive    Boolean   @default(true)
-  expiresAt   DateTime?
-  lastUsedAt  DateTime?
-  permissions Json?
-  createdAt   DateTime  @default(now())
-  
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@map("api_keys")
-}
-
-// Role-Based Access Control
-model Role {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  description String?
-  isSystem    Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  
-  rolePermissions RolePermission[]
-  userRolePermissions UserRolePermission[]
-  
-  @@map("roles")
-}
-
-model Permission {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  description String?
-  resource    String
-  action      String
-  createdAt   DateTime  @default(now())
-  
-  rolePermissions RolePermission[]
-  userRolePermissions UserRolePermission[]
-  
-  @@map("permissions")
-}
-
-model RolePermission {
-  id           String    @id @default(cuid())
-  roleId       String
-  permissionId String
-  
-  role         Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  
-  @@unique([roleId, permissionId])
-  @@map("role_permissions")
-}
-
-model UserRolePermission {
-  id           String    @id @default(cuid())
-  userId       String
-  roleId       String?
-  permissionId String?
-  grantedAt    DateTime  @default(now())
-  grantedBy    String?
-  
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role         Role?     @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission   Permission? @relation(fields: [permissionId], references: [id], onDelete: Cascade)
-  
-  @@map("user_role_permissions")
 }
 
 // Client Management
@@ -165,7 +78,7 @@ model Client {
   address             String?
   
   // Client Type and Industry
-  clientType          ClientType  @default(INDIVIDUAL)
+  clientType          String      @default("INDIVIDUAL") // INDIVIDUAL, CORPORATION, PARTNERSHIP, GOVERNMENT, NGO
   industry            String?
   description         String?
   
@@ -175,7 +88,7 @@ model Client {
   website             String?
   
   // Status and Assignment
-  status              ClientStatus @default(ACTIVE)
+  status              String      @default("ACTIVE") // ACTIVE, INACTIVE, PROSPECT, FORMER
   assignedLawyerId    String?
   
   // Timestamps
@@ -183,12 +96,10 @@ model Client {
   updatedAt           DateTime    @updatedAt
   
   // Relations
-  assignedLawyer      User?       @relation("AssignedLawyer", fields: [assignedLawyerId], references: [id])
+  assignedLawyer      User?       @relation(fields: [assignedLawyerId], references: [id])
   matters             Matter[]
   contracts           Contract[]
   documents           Document[]
-  risks               Risk[]
-  auditLogs           AuditLog[]
   
   @@map("clients")
 }
@@ -200,10 +111,10 @@ model Matter {
   description       String?
   
   // Matter Classification
-  type              MatterType
-  status            MatterStatus @default(OPEN)
-  priority          Priority    @default(MEDIUM)
-  riskLevel         RiskLevel   @default(LOW)
+  type              String      // CORPORATE, LITIGATION, INTELLECTUAL_PROPERTY, REAL_ESTATE, EMPLOYMENT, etc.
+  status            String      @default("OPEN") // OPEN, IN_PROGRESS, UNDER_REVIEW, ON_HOLD, COMPLETED, CLOSED
+  priority          String      @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
+  riskLevel         String      @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL
   
   // Financial Information
   estimatedValue    Float?
@@ -219,9 +130,9 @@ model Matter {
   clientId          String
   assignedLawyerId  String?
   
-  // Additional Information
-  tags              Json?
-  customFields      Json?
+  // Additional Information (simplified as text fields for SQLite)
+  tags              String?     // JSON-like string
+  customFields      String?     // JSON-like string
   
   // Timestamps
   createdAt         DateTime    @default(now())
@@ -229,13 +140,9 @@ model Matter {
   
   // Relations
   client            Client      @relation(fields: [clientId], references: [id])
-  assignedLawyer    User?       @relation("AssignedLawyer", fields: [assignedLawyerId], references: [id])
+  assignedLawyer    User?       @relation(fields: [assignedLawyerId], references: [id])
   contracts         Contract[]
   documents         Document[]
-  disputes          Dispute[]
-  risks             Risk[]
-  aiAnalyses        AIAnalysis[]
-  auditLogs         AuditLog[]
   
   @@map("matters")
 }
@@ -247,8 +154,8 @@ model Contract {
   description       String?
   
   // Contract Details
-  type              ContractType
-  status            ContractStatus @default(DRAFT)
+  type              String        // SERVICE_AGREEMENT, EMPLOYMENT_CONTRACT, VENDOR_AGREEMENT, NDA, etc.
+  status            String        @default("DRAFT") // DRAFT, UNDER_REVIEW, PENDING_SIGNATURE, SIGNED, APPROVED, EXECUTED, EXPIRED, TERMINATED
   value             Float?
   currency          String        @default("USD")
   
@@ -262,17 +169,17 @@ model Contract {
   terminationClause String?
   
   // Risk and Priority
-  riskLevel         RiskLevel     @default(LOW)
-  priority          Priority      @default(MEDIUM)
+  riskLevel         String        @default("LOW") // LOW, MEDIUM, HIGH, CRITICAL
+  priority          String        @default("MEDIUM") // LOW, MEDIUM, HIGH, CRITICAL
   
   // Assignment and Client
   clientId          String
   assignedLawyerId  String?
   matterId          String?
   
-  // Additional Information
-  tags              Json?
-  customFields      Json?
+  // Additional Information (simplified as text fields for SQLite)
+  tags              String?       // JSON-like string
+  customFields      String?       // JSON-like string
   
   // Timestamps
   createdAt         DateTime      @default(now())
@@ -280,12 +187,9 @@ model Contract {
   
   // Relations
   client            Client        @relation(fields: [clientId], references: [id])
-  assignedLawyer    User?         @relation("AssignedLawyer", fields: [assignedLawyerId], references: [id])
+  assignedLawyer    User?         @relation(fields: [assignedLawyerId], references: [id])
   matter            Matter?       @relation(fields: [matterId], references: [id])
   documents         Document[]
-  risks             Risk[]
-  aiAnalyses        AIAnalysis[]
-  auditLogs         AuditLog[]
   
   @@map("contracts")
 }
@@ -297,7 +201,7 @@ model Document {
   description       String?
   
   // File Information
-  type              DocumentType
+  type              String        // CONTRACT, LEGAL_MEMO, COURT_FILING, CORRESPONDENCE, RESEARCH, etc.
   fileType          String        // MIME type
   fileSize          Int
   fileName          String
@@ -307,7 +211,7 @@ model Document {
   // Security and Access
   isConfidential    Boolean       @default(false)
   encryptionKey     String?       // For encrypted documents
-  accessLevel       AccessLevel   @default(PRIVATE)
+  accessLevel       String        @default("PRIVATE") // PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED, PRIVATE
   
   // Version Control
   version           String        @default("1.0")
@@ -319,9 +223,9 @@ model Document {
   matterId          String?
   contractId        String?
   
-  // Metadata
-  tags              Json?
-  customFields      Json?
+  // Metadata (simplified as text fields for SQLite)
+  tags              String?       // JSON-like string
+  customFields      String?       // JSON-like string
   ocrText           String?       // OCR extracted text
   
   // Timestamps
@@ -329,422 +233,12 @@ model Document {
   updatedAt         DateTime      @updatedAt
   
   // Relations
-  uploadedBy        User          @relation("UploadedBy", fields: [uploadedById], references: [id])
+  uploadedBy        User          @relation(fields: [uploadedById], references: [id])
   client            Client?       @relation(fields: [clientId], references: [id])
   matter            Matter?       @relation(fields: [matterId], references: [id])
   contract          Contract?     @relation(fields: [contractId], references: [id])
   parentDocument    Document?     @relation("DocumentVersions", fields: [parentDocumentId], references: [id])
   childDocuments    Document[]    @relation("DocumentVersions")
-  aiAnalyses        AIAnalysis[]
-  auditLogs         AuditLog[]
   
   @@map("documents")
-}
-
-// Dispute Management
-model Dispute {
-  id                String        @id @default(cuid())
-  title             String
-  description       String?
-  
-  // Dispute Classification
-  type              DisputeType
-  status            DisputeStatus @default(OPEN)
-  priority          Priority      @default(MEDIUM)
-  riskLevel         RiskLevel     @default(MEDIUM)
-  
-  // Financial Information
-  claimAmount       Float?
-  estimatedLiability Float?
-  
-  // Legal Information
-  jurisdiction      String?
-  courtName         String?
-  caseNumber        String?
-  filingDate        DateTime?
-  trialDate         DateTime?
-  
-  // Assignment and Relations
-  clientId          String
-  assignedLawyerId  String?
-  matterId          String?
-  
-  // Timeline and Deadlines
-  deadlines         Json?
-  
-  // Additional Information
-  tags              Json?
-  customFields      Json?
-  
-  // Timestamps
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  
-  // Relations
-  client            Client        @relation(fields: [clientId], references: [id])
-  assignedLawyer    User?         @relation("AssignedLawyer", fields: [assignedLawyerId], references: [id])
-  matter            Matter?       @relation(fields: [matterId], references: [id])
-  auditLogs         AuditLog[]
-  
-  @@map("disputes")
-}
-
-// Risk Management
-model Risk {
-  id                String        @id @default(cuid())
-  title             String
-  description       String?
-  
-  // Risk Classification
-  type              RiskType
-  level             RiskLevel
-  probability       RiskProbability
-  impact            RiskImpact
-  
-  // Risk Scoring
-  riskScore         Float?        // Calculated risk score
-  mitigation        String?       // Mitigation strategies
-  
-  // Status and Assignment
-  status            RiskStatus    @default(ACTIVE)
-  identifiedBy      String
-  assessedBy        String?
-  
-  // Relations
-  clientId          String?
-  matterId          String?
-  contractId        String?
-  
-  // Timestamps
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  
-  // Relations
-  client            Client?       @relation(fields: [clientId], references: [id])
-  matter            Matter?       @relation(fields: [matterId], references: [id])
-  contract          Contract?     @relation(fields: [contractId], references: [id])
-  identifiedByUser  User          @relation("IdentifiedBy", fields: [identifiedBy], references: [id])
-  assessedByUser    User?         @relation("AssessedBy", fields: [assessedBy], references: [id])
-  auditLogs         AuditLog[]
-  
-  @@map("risks")
-}
-
-// Policy Management
-model Policy {
-  id                String        @id @default(cuid())
-  title             String
-  description       String?
-  
-  // Policy Details
-  type              PolicyType
-  status            PolicyStatus  @default(DRAFT)
-  effectiveDate     DateTime?
-  reviewDate        DateTime?
-  
-  // Content and Approval
-  content           Json?
-  createdBy         String
-  approvedBy        String?
-  
-  // Additional Information
-  tags              Json?
-  
-  // Timestamps
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  
-  // Relations
-  creator           User          @relation("CreatedBy", fields: [createdBy], references: [id])
-  approver          User?         @relation("ApprovedBy", fields: [approvedBy], references: [id])
-  auditLogs         AuditLog[]
-  
-  @@map("policies")
-}
-
-// AI Analysis
-model AIAnalysis {
-  id                String        @id @default(cuid())
-  title             String
-  type              AIAnalysisType
-  
-  // Input and Output
-  input             Json
-  output            Json
-  confidence        Int           // 0-100
-  
-  // AI Provider Information
-  provider          String        // 'openai', 'anthropic', etc.
-  model             String
-  processingTime    Int           // milliseconds
-  tokensUsed        Int?
-  cost              Float?
-  
-  // Status and Relations
-  status            AIAnalysisStatus @default(PENDING)
-  userId            String
-  matterId          String?
-  contractId        String?
-  documentId        String?
-  
-  // Timestamps
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  
-  // Relations
-  user              User          @relation(fields: [userId], references: [id])
-  matter            Matter?       @relation(fields: [matterId], references: [id])
-  contract          Contract?     @relation(fields: [contractId], references: [id])
-  document          Document?     @relation(fields: [documentId], references: [id])
-  auditLogs         AuditLog[]
-  
-  @@map("ai_analyses")
-}
-
-// Audit Logging
-model AuditLog {
-  id                String        @id @default(cuid())
-  
-  // Action Details
-  action            String        // CREATE, UPDATE, DELETE, VIEW, etc.
-  resource          String        // users, clients, matters, etc.
-  resourceId        String?
-  
-  // User and Context
-  userId            String?
-  ipAddress         String?
-  userAgent         String?
-  
-  // Changes
-  oldValues         Json?
-  newValues         Json?
-  
-  // Additional Context
-  metadata          Json?
-  
-  // Relations (optional, for easier querying)
-  clientId          String?
-  matterId          String?
-  contractId        String?
-  documentId        String?
-  riskId            String?
-  policyId          String?
-  aiAnalysisId      String?
-  
-  // Timestamp
-  createdAt         DateTime      @default(now())
-  
-  // Relations
-  user              User?         @relation(fields: [userId], references: [id])
-  client            Client?       @relation(fields: [clientId], references: [id])
-  matter            Matter?       @relation(fields: [matterId], references: [id])
-  contract          Contract?     @relation(fields: [contractId], references: [id])
-  document          Document?     @relation(fields: [documentId], references: [id])
-  risk              Risk?         @relation(fields: [riskId], references: [id])
-  policy            Policy?       @relation(fields: [policyId], references: [id])
-  aiAnalysis        AIAnalysis?   @relation(fields: [aiAnalysisId], references: [id])
-  
-  @@map("audit_logs")
-}
-
-// Enums
-enum UserRole {
-  ADMIN
-  USER
-  GUEST
-}
-
-enum UserStatus {
-  ACTIVE
-  PENDING_VERIFICATION
-  SUSPENDED
-  DEACTIVATED
-}
-
-enum ClientType {
-  INDIVIDUAL
-  CORPORATION
-  PARTNERSHIP
-  GOVERNMENT
-  NGO
-}
-
-enum ClientStatus {
-  ACTIVE
-  INACTIVE
-  PROSPECT
-  FORMER
-}
-
-enum MatterType {
-  CORPORATE
-  LITIGATION
-  INTELLECTUAL_PROPERTY
-  REAL_ESTATE
-  EMPLOYMENT
-  REGULATORY
-  FAMILY
-  CRIMINAL
-  IMMIGRATION
-  BANKRUPTCY
-  TAX
-  OTHER
-}
-
-enum MatterStatus {
-  OPEN
-  IN_PROGRESS
-  UNDER_REVIEW
-  ON_HOLD
-  COMPLETED
-  CLOSED
-}
-
-enum ContractType {
-  SERVICE_AGREEMENT
-  EMPLOYMENT_CONTRACT
-  VENDOR_AGREEMENT
-  NDA
-  LEASE_AGREEMENT
-  PURCHASE_AGREEMENT
-  JOINT_VENTURE
-  LICENSE_AGREEMENT
-  CONSULTING_AGREEMENT
-  OTHER
-}
-
-enum ContractStatus {
-  DRAFT
-  UNDER_REVIEW
-  PENDING_SIGNATURE
-  SIGNED
-  APPROVED
-  EXECUTED
-  EXPIRED
-  TERMINATED
-}
-
-enum DocumentType {
-  CONTRACT
-  LEGAL_MEMO
-  COURT_FILING
-  CORRESPONDENCE
-  RESEARCH
-  COMPLIANCE_REPORT
-  EVIDENCE
-  INVOICE
-  OTHER
-}
-
-enum AccessLevel {
-  PUBLIC
-  INTERNAL
-  CONFIDENTIAL
-  RESTRICTED
-  PRIVATE
-}
-
-enum DisputeType {
-  CONTRACT
-  EMPLOYMENT
-  INTELLECTUAL_PROPERTY
-  REGULATORY
-  COMMERCIAL
-  TORT
-  OTHER
-}
-
-enum DisputeStatus {
-  OPEN
-  INVESTIGATION
-  DISCOVERY
-  MEDIATION
-  ARBITRATION
-  LITIGATION
-  SETTLEMENT
-  CLOSED
-}
-
-enum RiskType {
-  LEGAL_RISK
-  FINANCIAL_RISK
-  OPERATIONAL_RISK
-  COMPLIANCE_RISK
-  REPUTATIONAL_RISK
-  CONTRACT_RISK
-  REGULATORY_RISK
-  OTHER
-}
-
-enum RiskLevel {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
-enum RiskProbability {
-  LOW
-  MEDIUM
-  HIGH
-  VERY_HIGH
-}
-
-enum RiskImpact {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
-enum RiskStatus {
-  ACTIVE
-  MITIGATED
-  ACCEPTED
-  TRANSFERRED
-  CLOSED
-}
-
-enum Priority {
-  LOW
-  MEDIUM
-  HIGH
-  CRITICAL
-}
-
-enum PolicyType {
-  DATA_PROTECTION
-  CONFLICT_OF_INTEREST
-  SECURITY_POLICY
-  RETENTION_POLICY
-  COMPLIANCE_POLICY
-  HR_POLICY
-  OTHER
-}
-
-enum PolicyStatus {
-  DRAFT
-  UNDER_REVIEW
-  ACTIVE
-  ARCHIVED
-  SUPERSEDED
-}
-
-enum AIAnalysisType {
-  CONTRACT_ANALYSIS
-  LEGAL_RESEARCH
-  RISK_ASSESSMENT
-  COMPLIANCE_CHECK
-  DOCUMENT_REVIEW
-  CLAUSE_EXTRACTION
-  SENTIMENT_ANALYSIS
-  OTHER
-}
-
-enum AIAnalysisStatus {
-  PENDING
-  IN_PROGRESS
-  COMPLETED
-  FAILED
-  CANCELLED
 }

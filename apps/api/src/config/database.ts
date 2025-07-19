@@ -15,44 +15,14 @@ const globalForPrisma = globalThis as unknown as {
 // Create Prisma client with optimized configuration
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({
   log: env.NODE_ENV === 'development' 
-    ? [
-        { emit: 'event', level: 'query' },
-        { emit: 'event', level: 'info' },
-        { emit: 'event', level: 'warn' },
-        { emit: 'event', level: 'error' }
-      ]
-    : [
-        { emit: 'event', level: 'error' }
-      ],
+    ? ['query', 'info', 'warn', 'error']
+    : ['error'],
   errorFormat: 'pretty',
   datasources: {
     db: {
       url: env.DATABASE_URL
     }
   }
-});
-
-// Set up logging for Prisma events
-if (env.NODE_ENV === 'development') {
-  prisma.$on('query', (e) => {
-    logger.debug('Prisma Query', {
-      query: e.query,
-      params: e.params,
-      duration: `${e.duration}ms`
-    });
-  });
-  
-  prisma.$on('info', (e) => {
-    logger.info('Prisma Info', { message: e.message });
-  });
-  
-  prisma.$on('warn', (e) => {
-    logger.warn('Prisma Warning', { message: e.message });
-  });
-}
-
-prisma.$on('error', (e) => {
-  logger.error('Prisma Error', { message: e.message });
 });
 
 // Prevent multiple instances in development
@@ -117,9 +87,9 @@ export async function initializeDatabase(): Promise<void> {
 
 // Transaction helper
 export async function transaction<T>(
-  fn: (prisma: PrismaClient) => Promise<T>
+  fn: (prisma: any) => Promise<T>
 ): Promise<T> {
-  return prisma.$transaction(fn);
+  return prisma.$transaction(fn as any) as Promise<T>;
 }
 
 // Handle graceful shutdown

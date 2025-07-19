@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Search, FileText, Upload, Download, Filter, Edit, Eye, Trash2, 
   Plus, Calendar, DollarSign, AlertTriangle, CheckCircle, Clock,

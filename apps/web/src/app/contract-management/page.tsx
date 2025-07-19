@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import MainLayout from '../../components/layout/MainLayout';
-import { FileText, Plus, Search, Download, Upload, Edit3, Trash2, Eye, CheckCircle, AlertTriangle, BarChart3, Calendar, Brain, TrendingUp, Clock, DollarSign, Loader2 } from 'lucide-react';
+import { FileText, Plus, Download, Upload, Edit3, Trash2, Eye, CheckCircle, BarChart3, Calendar, Brain, TrendingUp, Clock, DollarSign, Loader2 } from 'lucide-react';
 import { useContracts, useCreateContract, useAnalyzeContract, useContractStats, useClients } from '../../hooks/useApi';
 import { useAuth } from '../../providers/auth-provider';
 import { useDebouncedSearch } from '../../hooks/useDebounced';

@@ -1,7 +1,7 @@
 // Client Form Modal with Comprehensive Validation
 // Provides a complete form for creating and editing clients with real-time validation
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import FormField, { FormSection, FormGrid, FormActions } from '../ui/FormField';
 import { validateForm, clientValidationSchema, validateFieldRealTime } from '../../utils/validation';
