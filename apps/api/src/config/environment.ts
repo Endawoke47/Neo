@@ -12,11 +12,17 @@ const environmentSchema = z.object({
   PORT: z.string().transform(Number).default('8000'),
   
   // Database (required)
-  DATABASE_URL: z.string().url('Invalid database URL'),
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   
   // JWT Secrets (required in production)
-  JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
-  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
+  JWT_SECRET: z.string().min(1, 'JWT_SECRET is required').refine(
+    (val) => process.env.NODE_ENV !== 'production' || val.length >= 64,
+    'JWT_SECRET must be at least 64 characters in production'
+  ),
+  JWT_REFRESH_SECRET: z.string().min(1, 'JWT_REFRESH_SECRET is required').refine(
+    (val) => process.env.NODE_ENV !== 'production' || val.length >= 64,
+    'JWT_REFRESH_SECRET must be at least 64 characters in production'
+  ),
   JWT_AUDIENCE: z.string().default('counselflow-api'),
   JWT_ISSUER: z.string().default('counselflow'),
   
@@ -64,6 +70,14 @@ const environmentSchema = z.object({
   
   // Encryption
   SECRETS_ENCRYPTION_KEY: z.string().min(32).optional(),
+  
+  // Security Headers
+  ALLOWED_ORIGINS: z.string().default('http://localhost:3000'),
+  COOKIE_SECRET: z.string().min(32).optional(),
+  
+  // Rate Limiting
+  ENABLE_RATE_LIMITING: z.string().transform(Boolean).default('true'),
+  RATE_LIMIT_STRICT_MODE: z.string().transform(Boolean).default('false'),
 });
 
 // Environment validation result type
@@ -123,12 +137,21 @@ function validateProductionRequirements(env: Environment): void {
   }
   
   // Validate JWT secrets strength in production
-  if (env.JWT_SECRET.length < 64) {
-    console.warn('JWT_SECRET should be at least 64 characters in production');
+  if (env.JWT_SECRET.length < 128) {
+    console.warn('JWT_SECRET should be at least 128 characters for maximum production security');
   }
   
-  if (env.JWT_REFRESH_SECRET.length < 64) {
-    console.warn('JWT_REFRESH_SECRET should be at least 64 characters in production');
+  if (env.JWT_REFRESH_SECRET.length < 128) {
+    console.warn('JWT_REFRESH_SECRET should be at least 128 characters for maximum production security');
+  }
+  
+  // Additional security validations
+  if (!env.SECRETS_ENCRYPTION_KEY) {
+    console.warn('SECRETS_ENCRYPTION_KEY should be set in production for data encryption');
+  }
+  
+  if (!env.COOKIE_SECRET) {
+    console.warn('COOKIE_SECRET should be set in production for session security');
   }
   
   // Validate secure origins

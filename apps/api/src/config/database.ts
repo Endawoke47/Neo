@@ -1,17 +1,143 @@
 /**
- * Minimal Database Configuration
- * Zero-error Prisma setup
+ * Database Configuration and Connection Management
+ * Prisma client setup with connection pooling and error handling
  */
 
 import { PrismaClient } from '@prisma/client';
 import { env } from './environment';
+import { logger } from './logger';
 
-export const prisma = new PrismaClient({
+// Global prisma instance
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+// Create Prisma client with optimized configuration
+export const prisma = globalForPrisma.prisma ?? new PrismaClient({
+  log: env.NODE_ENV === 'development' 
+    ? [
+        { emit: 'event', level: 'query' },
+        { emit: 'event', level: 'info' },
+        { emit: 'event', level: 'warn' },
+        { emit: 'event', level: 'error' }
+      ]
+    : [
+        { emit: 'event', level: 'error' }
+      ],
+  errorFormat: 'pretty',
   datasources: {
     db: {
-      url: env.DATABASE_URL,
-    },
-  },
+      url: env.DATABASE_URL
+    }
+  }
+});
+
+// Set up logging for Prisma events
+if (env.NODE_ENV === 'development') {
+  prisma.$on('query', (e) => {
+    logger.debug('Prisma Query', {
+      query: e.query,
+      params: e.params,
+      duration: `${e.duration}ms`
+    });
+  });
+  
+  prisma.$on('info', (e) => {
+    logger.info('Prisma Info', { message: e.message });
+  });
+  
+  prisma.$on('warn', (e) => {
+    logger.warn('Prisma Warning', { message: e.message });
+  });
+}
+
+prisma.$on('error', (e) => {
+  logger.error('Prisma Error', { message: e.message });
+});
+
+// Prevent multiple instances in development
+if (env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma;
+}
+
+// Database connection health check
+export async function checkDatabaseConnection(): Promise<boolean> {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    logger.info('Database connection successful');
+    return true;
+  } catch (error) {
+    logger.error('Database connection failed', { error });
+    return false;
+  }
+}
+
+// Database statistics
+export async function getDatabaseStats(): Promise<any> {
+  try {
+    const [userCount, clientCount, matterCount, contractCount, documentCount] = await Promise.all([
+      prisma.user.count(),
+      prisma.client.count(),
+      prisma.matter.count(),
+      prisma.contract.count(),
+      prisma.document.count()
+    ]);
+    
+    return {
+      users: userCount,
+      clients: clientCount,
+      matters: matterCount,
+      contracts: contractCount,
+      documents: documentCount,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    logger.error('Failed to get database statistics', { error });
+    throw error;
+  }
+}
+
+// Initialize database connection and run migrations if needed
+export async function initializeDatabase(): Promise<void> {
+  try {
+    logger.info('Initializing database connection...');
+    
+    // Test connection
+    const isConnected = await checkDatabaseConnection();
+    if (!isConnected) {
+      throw new Error('Could not establish database connection');
+    }
+    
+    logger.info('Database initialized successfully');
+  } catch (error) {
+    logger.error('Database initialization failed', { error });
+    throw error;
+  }
+}
+
+// Transaction helper
+export async function transaction<T>(
+  fn: (prisma: PrismaClient) => Promise<T>
+): Promise<T> {
+  return prisma.$transaction(fn);
+}
+
+// Handle graceful shutdown
+process.on('beforeExit', async () => {
+  logger.info('Disconnecting from database...');
+  await prisma.$disconnect();
+});
+
+process.on('SIGINT', async () => {
+  logger.info('Received SIGINT, disconnecting from database...');
+  await prisma.$disconnect();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  logger.info('Received SIGTERM, disconnecting from database...');
+  await prisma.$disconnect();
+  process.exit(0);
 });
 
 export default prisma;

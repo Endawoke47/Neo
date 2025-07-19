@@ -1,227 +1,324 @@
-# CounselFlow-Neo - AI-Powered Global Legal Platform
+# CounselFlow Neo - Production Ready
 
-![CounselFlow AI](https://img.shields.io/badge/CounselFlow-AI%20Legal%20Platform-14b8a6?style=for-the-badge&logo=legal&logoColor=white)
-![Global Coverage](https://img.shields.io/badge/Global-71%20Jurisdictions-0ea5e9?style=for-the-badge&logo=globe&logoColor=white)
-![AI Powered](https://img.shields.io/badge/AI%20Ready-Phase%201%20Complete-16a34a?style=for-the-badge&logo=openai&logoColor=white)
+Enterprise-grade legal management platform with AI capabilities for 71 global jurisdictions.
 
-## 🎉 **MAJOR MILESTONE: PHASE 1 AI INFRASTRUCTURE COMPLETE** ✅
+## 🚀 Quick Start
 
-**CounselFlow-Neo** now features a **complete AI-powered legal platform** serving **71 jurisdictions** across Africa and the Middle East, with self-hosted AI capabilities and hybrid premium API integration.
+### Prerequisites
 
----
+- Node.js 18+ 
+- PostgreSQL 14+
+- Redis (optional, recommended for production)
+- Docker & Docker Compose (for containerized deployment)
 
-## 🤖 **AI CAPABILITIES NOW LIVE**
+### Development Setup
 
-### 🌍 **Global Legal Coverage**
-- ✅ **54 African Countries**: Complete coverage from Algeria to Zimbabwe
-- ✅ **17 Middle Eastern Countries**: UAE, Saudi Arabia, Israel, Turkey, Iran, and more
-- ✅ **10 Languages**: English, French, Arabic, Portuguese, Swahili, Amharic, Hebrew, Farsi, Turkish, German
-- ✅ **5 Legal Systems**: Common Law, Civil Law, Islamic Law, Customary Law, Mixed Systems
+1. **Clone and Install**
+   ```bash
+   git clone https://github.com/Endawoke47/Neo.git
+   cd Neo
+   npm install
+   ```
 
-### 🚀 **AI Infrastructure** 
-- ✅ **AI Gateway Service**: Multi-provider orchestration with smart routing
-- ✅ **5 AI Providers**: Ollama (self-hosted), Legal-BERT, OpenAI, Anthropic, Google
-- ✅ **Cost-Effective**: Self-hosted primary with hybrid premium fallback
-- ✅ **Production Ready**: 100% TypeScript, comprehensive testing, monitoring
+2. **Environment Configuration**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
 
-### 🔗 **Live API Endpoints**
-```bash
-POST /api/v1/ai/analyze              # Main AI analysis
-POST /api/v1/ai/contract/analyze     # Contract analysis with risk scoring
-POST /api/v1/ai/research             # Legal research across 71 jurisdictions
-POST /api/v1/ai/risk/assess          # AI risk assessment with confidence
-POST /api/v1/ai/compliance/check     # Regulatory compliance verification
-POST /api/v1/ai/document/review      # Automated document analysis
-GET  /api/v1/ai/health              # System health monitoring
-GET  /api/v1/ai/jurisdictions       # Available jurisdictions
-GET  /api/v1/ai/languages           # Supported languages
-```
+3. **Database Setup**
+   ```bash
+   cd apps/api
+   npx prisma generate
+   npx prisma migrate dev
+   npx prisma seed
+   ```
 
----
+4. **Start Development**
+   ```bash
+   # Terminal 1: API Server
+   cd apps/api
+   npm run dev
 
-## 🏗️ **COMPLETE PROJECT STRUCTURE**
+   # Terminal 2: Web Application  
+   cd apps/web
+   npm run dev
+   ```
 
-```
-CounselFlow-Neo/
-├── 🤖 AI Infrastructure (PHASE 1 COMPLETE)
-│   ├── apps/api/src/services/ai-gateway.service.ts    # Multi-provider orchestration
-│   ├── apps/api/src/services/providers/               # 5 AI providers
-│   ├── apps/api/src/types/ai.types.ts                # 71-jurisdiction type system
-│   ├── apps/api/src/routes/ai.routes.ts               # Complete AI REST API
-│   └── apps/api/src/services/usage-tracker.service.ts # Cost monitoring
-├── 🌐 Frontend Application
-│   ├── apps/web/                                      # Next.js 14 application
-│   └── Modern UI with corporate theme
-├── 📊 Backend Services  
-│   ├── apps/api/                                      # Express.js API
-│   └── Full authentication and security
-├── 🧪 Testing & Verification
-│   ├── test-ai-system.js                             # Comprehensive AI tests
-│   ├── verify-ai-deployment.js                       # Deployment verification
-│   └── 100% TypeScript compilation success
-└── 📚 Documentation
-    ├── AI_DEVELOPMENT.md                             # Complete AI implementation docs
-    └── Full project documentation
-```
+5. **Access Application**
+   - **API**: http://localhost:8000
+   - **Web App**: http://localhost:3000
+   - **Health Check**: http://localhost:8000/health
 
----
+## 🐳 Production Deployment
 
-## 🎯 **DEVELOPMENT PHASES**
-
-### ✅ **PHASE 1: AI FOUNDATION - 100% COMPLETE**
-- **Multi-provider AI Gateway** with intelligent routing
-- **71 Global Jurisdictions** with legal system awareness
-- **Self-hosted + Hybrid** architecture for cost optimization
-- **Complete REST API** for all legal AI operations
-- **Production-ready** with monitoring, caching, and error handling
-
-### 🔄 **PHASE 2: CORE AI FEATURES - READY**
-- Legal Research Engine with semantic search
-- Contract Intelligence with advanced clause extraction
-- Risk Assessment Models with predictive analytics
-- AI Validation Framework
-- Enhanced Caching Strategies
-
-### 📋 **PHASE 3: ADVANCED FEATURES - PLANNED**
-- Predictive Analytics for legal outcomes
-- Workflow Automation with AI triggers
-- Real-time AI Processing
-- Multi-modal AI (text, documents, images)
-- Collaboration Tools with AI assistance
-
----
-
-## � **QUICK START**
-
-### 1. **Clone & Install**
-```bash
-git clone https://github.com/Endawoke47/CounselFlow-Neo.git
-cd CounselFlow-Neo
-npm install
-```
-
-### 2. **Environment Setup** (Self-hosted works without API keys)
-```bash
-# Optional: Premium AI providers
-OPENAI_API_KEY="your-openai-key"           # For OpenAI features
-ANTHROPIC_API_KEY="your-anthropic-key"     # For Claude features
-GOOGLE_API_KEY="your-google-key"           # For Gemini features
-
-# Self-hosted AI (Works immediately)
-OLLAMA_BASE_URL="http://localhost:11434"   # Local Ollama
-LEGAL_BERT_MODEL_PATH="./models/legal-bert" # Legal-BERT
-```
-
-### 3. **Start Development**
-```bash
-npm run dev                    # Start development server
-node test-ai-system.js        # Test AI capabilities
-node verify-ai-deployment.js  # Verify production readiness
-```
-
-### 4. **Access Platform**
-- **Frontend**: http://localhost:3000
-- **API**: http://localhost:3005
-- **AI Health**: http://localhost:3005/api/v1/ai/health
-
----
-
-## 🧪 **TESTING & QUALITY**
+### Docker Deployment
 
 ```bash
-# Comprehensive AI system testing
-node test-ai-system.js
-# ✅ Contract Analysis - Nigerian Law
-# ✅ Legal Research - South African Competition Law
-# ✅ Risk Assessment - UAE Corporate Structure
-# ✅ Multi-jurisdiction Transaction Analysis
+# Build and start all services
+docker-compose -f docker-compose.prod.yml up -d
 
-# Deployment verification
-node verify-ai-deployment.js
-# ✅ 12/12 core components verified
-# ✅ 100% deployment readiness
-# ✅ All AI dependencies installed
+# View logs
+docker-compose -f docker-compose.prod.yml logs -f
 
-# Build verification
-cd apps/api && npm run build
-# ✅ TypeScript compilation: 0 errors
+# Scale services
+docker-compose -f docker-compose.prod.yml up -d --scale counselflow-api=2
 ```
 
+### Manual Production Deployment
+
+1. **Build Applications**
+   ```bash
+   cd apps/api
+   npm run build
+
+   cd ../web
+   npm run build
+   ```
+
+2. **Database Migration**
+   ```bash
+   cd apps/api
+   npx prisma migrate deploy
+   ```
+
+3. **Start Production Services**
+   ```bash
+   cd apps/api
+   npm run start:prod
+   ```
+
+## 🔧 Configuration
+
+### Required Environment Variables
+
+```bash
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/counselflow_neo
+
+# Authentication
+JWT_SECRET=your-super-secure-jwt-secret-64-chars-min
+JWT_REFRESH_SECRET=your-super-secure-refresh-secret-64-chars-min
+
+# Application
+NODE_ENV=production
+PORT=8000
+```
+
+### Optional Environment Variables
+
+```bash
+# Redis (recommended for production)
+REDIS_URL=redis://localhost:6379
+
+# AI Services (optional)
+OPENAI_API_KEY=sk-your-openai-key
+ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
+
+# Email (for production)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your-email@domain.com
+SMTP_PASSWORD=your-app-password
+
+# Security
+CORS_ORIGIN=https://your-domain.com
+RATE_LIMIT_MAX_REQUESTS=100
+```
+
+## 🔐 Security Features
+
+- **Authentication**: JWT-based with refresh tokens
+- **Authorization**: Role-based access control
+- **Rate Limiting**: Configurable request limiting
+- **Security Headers**: Helmet.js protection
+- **Input Validation**: Zod schema validation
+- **Password Security**: bcrypt hashing
+- **CORS**: Configurable origins
+- **Request Logging**: Comprehensive audit trails
+
+## 🧪 Testing
+
+```bash
+# Run all tests
+npm test
+
+# Run with coverage
+npm run test:coverage
+
+# Run specific test suite
+cd apps/api
+npm test
+
+cd apps/web  
+npm test
+```
+
+## 📊 Health Monitoring
+
+### Health Check Endpoints
+
+- **Basic Health**: `GET /health`
+- **Deep Health**: `GET /api/health/deep`
+- **Readiness**: `GET /api/health/ready` (Kubernetes)
+- **Liveness**: `GET /api/health/live` (Kubernetes)
+- **Metrics**: `GET /api/health/metrics`
+
+### Example Health Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "healthy",
+    "timestamp": "2025-01-19T10:30:00Z",
+    "version": "1.0.0",
+    "environment": "production",
+    "uptime": 3600.45
+  }
+}
+```
+
+## 🏗️ Architecture
+
+### Backend (API)
+- **Framework**: Express.js with TypeScript
+- **Database**: PostgreSQL with Prisma ORM
+- **Authentication**: JWT with role-based access
+- **Validation**: Zod schemas
+- **Logging**: Winston with rotation
+- **Caching**: Redis (optional)
+
+### Frontend (Web)
+- **Framework**: Next.js 14 with TypeScript
+- **Styling**: Tailwind CSS
+- **State Management**: React hooks
+- **UI Components**: Radix UI primitives
+- **Validation**: React Hook Form + Zod
+
+### AI Capabilities
+- **Providers**: Ollama (self-hosted), OpenAI, Anthropic
+- **Features**: Contract analysis, legal research, risk assessment
+- **Jurisdictions**: 71 countries (54 African + 17 Middle Eastern)
+- **Languages**: 10 supported languages
+
+## 📁 Project Structure
+
+```
+Neo/
+├── apps/
+│   ├── api/                 # Express.js API server
+│   │   ├── src/
+│   │   │   ├── config/      # Configuration files
+│   │   │   ├── middleware/  # Express middleware
+│   │   │   ├── routes/      # API routes
+│   │   │   └── index.ts     # Server entry point
+│   │   ├── prisma/          # Database schema & migrations
+│   │   └── Dockerfile       # API container
+│   └── web/                 # Next.js web application
+│       ├── src/
+│       │   ├── app/         # Next.js app router
+│       │   ├── components/  # React components
+│       │   └── lib/         # Utilities
+│       └── Dockerfile       # Web container
+├── packages/                # Shared packages
+├── .env.example            # Environment template
+├── docker-compose.prod.yml # Production compose
+└── README.md              # This file
+```
+
+## 🚨 Production Checklist
+
+### Before Deployment
+- [ ] Set strong JWT secrets (64+ characters)
+- [ ] Configure production database
+- [ ] Set up Redis for caching
+- [ ] Configure SMTP for emails
+- [ ] Set CORS origins
+- [ ] Enable HTTPS
+- [ ] Set up monitoring
+- [ ] Configure backups
+
+### Security Hardening
+- [ ] Use environment variables for secrets
+- [ ] Enable rate limiting
+- [ ] Set up proper CORS
+- [ ] Configure security headers
+- [ ] Set up log rotation
+- [ ] Enable audit logging
+- [ ] Configure firewall
+
+### Performance Optimization
+- [ ] Set up database connection pooling
+- [ ] Configure Redis caching
+- [ ] Enable compression
+- [ ] Set up CDN for static assets
+- [ ] Configure load balancing
+- [ ] Monitor application metrics
+
+## 📝 API Documentation
+
+### Authentication Endpoints
+
+```bash
+POST /api/auth/login       # User login
+POST /api/auth/register    # User registration  
+POST /api/auth/refresh     # Refresh access token
+POST /api/auth/logout      # Logout user
+GET  /api/auth/me          # Get current user
+```
+
+### Example Login Request
+
+```bash
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword"
+  }'
+```
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+1. **Database Connection Error**
+   ```bash
+   # Check DATABASE_URL in .env
+   # Ensure PostgreSQL is running
+   # Verify database exists
+   ```
+
+2. **JWT Token Error**
+   ```bash
+   # Check JWT_SECRET is set
+   # Ensure secret is 64+ characters in production
+   # Verify token hasn't expired
+   ```
+
+3. **Build Failures**
+   ```bash
+   # Clear node_modules and reinstall
+   rm -rf node_modules package-lock.json
+   npm install
+   
+   # Clear build caches
+   npm run clean
+   npm run build
+   ```
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/Endawoke47/Neo/issues)
+- **Documentation**: See `/docs` directory
+- **Security**: Report security issues responsibly
+
+## 📄 License
+
+Proprietary - All rights reserved
+
 ---
 
-## 🌍 **SUPPORTED REGIONS**
-
-### 🌍 **54 African Countries**
-Algeria, Angola, Benin, Botswana, Burkina Faso, Burundi, Cameroon, Cape Verde, Central African Republic, Chad, Comoros, Congo, Democratic Republic of Congo, Djibouti, Egypt, Equatorial Guinea, Eritrea, Eswatini, Ethiopia, Gabon, Gambia, Ghana, Guinea, Guinea-Bissau, Ivory Coast, Kenya, Lesotho, Liberia, Libya, Madagascar, Malawi, Mali, Mauritania, Mauritius, Morocco, Mozambique, Namibia, Niger, Nigeria, Rwanda, São Tomé and Príncipe, Senegal, Seychelles, Sierra Leone, Somalia, South Africa, South Sudan, Sudan, Tanzania, Togo, Tunisia, Uganda, Zambia, Zimbabwe
-
-### 🕌 **17 Middle Eastern Countries**
-UAE, Saudi Arabia, Israel, Turkey, Iran, Iraq, Jordan, Kuwait, Lebanon, Oman, Palestine, Qatar, Syria, Yemen, Bahrain, Cyprus
-
----
-
-## 💰 **COST-EFFECTIVE AI ARCHITECTURE**
-
-### 🏠 **Self-Hosted Primary (FREE)**
-- **Ollama**: Local AI models (Llama, Mistral)
-- **Legal-BERT**: Specialized legal language processing
-- **Zero ongoing costs** for basic operations
-
-### ☁️ **Hybrid Premium (OPTIONAL)**
-- **OpenAI GPT-4**: For complex analysis when API key provided
-- **Anthropic Claude**: For advanced legal reasoning
-- **Google Gemini**: For comprehensive research
-- **Smart routing**: Automatic cost optimization
-
----
-
-## 🏆 **ACHIEVEMENTS**
-
-- ✅ **Complete AI Legal Platform** serving 71 countries
-- ✅ **Self-hosted capability** with zero ongoing API costs
-- ✅ **Hybrid architecture** with premium fallback
-- ✅ **Production-ready** infrastructure with 100% test coverage
-- ✅ **Global coverage** for African and Middle Eastern legal systems
-- ✅ **Multi-language support** for diverse legal markets
-- ✅ **TypeScript safety** with comprehensive type system
-- ✅ **API-first design** with complete REST endpoints
-
----
-
-## 📚 **DOCUMENTATION**
-
-- 📖 [AI Development Guide](AI_DEVELOPMENT.md) - Complete AI implementation
-- 🧪 [Testing Suite](test-ai-system.js) - Comprehensive test scenarios
-- 🔍 [Deployment Verification](verify-ai-deployment.js) - Production readiness
-- 📊 [API Documentation](apps/api/src/routes/ai.routes.ts) - Complete endpoint reference
-
----
-
-## 🤝 **CONTRIBUTING**
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
----
-
-## 📄 **LICENSE**
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🌟 **WHAT'S NEXT?**
-
-**Phase 1 Complete** ✅ - AI Foundation Infrastructure  
-**Phase 2 Ready** 🚀 - Legal Research Engine & Contract Intelligence  
-**Phase 3 Planned** 📋 - Advanced Features & Automation
-
-**CounselFlow-Neo** is now ready for production deployment with complete AI capabilities serving 71 global jurisdictions!
-
----
-
-**🌍 CounselFlow-Neo - Intelligent Legal Technology for the Global Legal Industry**
-
-*Empowering legal professionals across 71 jurisdictions with AI-powered practice management*
+**CounselFlow Neo** - Enterprise Legal Management Platform  
+*Empowering legal professionals with AI-powered practice management*

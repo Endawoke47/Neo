@@ -1,5 +1,5 @@
-# A+++++ Production Dockerfile
-# Multi-stage build optimized for A+++++ architecture
+# CounselFlow Neo API Production Dockerfile
+# Multi-stage build optimized for production deployment
 FROM node:20-alpine AS base
 
 # Install security updates and required dependencies
@@ -7,83 +7,86 @@ RUN apk update && apk upgrade && \
     apk add --no-cache \
     dumb-init \
     curl \
-    ca-certificates \
-    tini && \
+    ca-certificates && \
     rm -rf /var/cache/apk/*
 
-# Create app directory
+# Set working directory
 WORKDIR /app
 
-# Copy package files for better Docker layer caching
+# Copy workspace package files
 COPY package*.json ./
-COPY apps/api/package*.json ./apps/api/
+COPY turbo.json ./
 
-# Dependency installation stage
+# Dependencies stage - production only
 FROM base AS deps
-RUN npm ci --only=production && \
-    npm cache clean --force
+COPY apps/api/package*.json ./apps/api/
+RUN cd apps/api && npm ci --only=production && npm cache clean --force
 
-# Development dependencies for building
-FROM base AS dev-deps
-COPY . .
-RUN npm ci
+# Build dependencies stage - includes dev dependencies
+FROM base AS build-deps
+COPY apps/api/package*.json ./apps/api/
+RUN cd apps/api && npm ci
 
 # Build stage
-FROM dev-deps AS builder
+FROM build-deps AS builder
+COPY apps/api/ ./apps/api/
 WORKDIR /app/apps/api
 
-# Generate Prisma client for A+++++ architecture
-RUN npm run prisma:generate
+# Generate Prisma client
+RUN npx prisma generate
 
 # Build the application
 RUN npm run build
 
-# Production stage - A+++++ optimized
+# Production runtime stage
 FROM node:20-alpine AS production
 
-# Install runtime security updates
+# Install runtime dependencies and security updates
 RUN apk update && apk upgrade && \
     apk add --no-cache \
     dumb-init \
     curl \
     ca-certificates && \
-    rm -rf /var/cache/apk/*
+    rm -rf /var/cache/apk/* && \
+    npm install -g pm2
 
-# Set production environment
+# Set production environment variables
 ENV NODE_ENV=production
 ENV PORT=8000
+ENV NPM_CONFIG_PRODUCTION=true
 
 # Create app directory
 WORKDIR /app
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S counselflow -u 1001
+    adduser -S counselflow -u 1001 -G nodejs
 
 # Copy production dependencies
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps --chown=counselflow:nodejs /app/apps/api/node_modules ./node_modules
 
-# Copy built application
-COPY --from=builder /app/apps/api/dist ./dist
-COPY --from=builder /app/apps/api/package*.json ./
-COPY --from=builder /app/apps/api/prisma ./prisma
+# Copy built application and necessary files
+COPY --from=builder --chown=counselflow:nodejs /app/apps/api/dist ./dist
+COPY --from=builder --chown=counselflow:nodejs /app/apps/api/package*.json ./
+COPY --from=builder --chown=counselflow:nodejs /app/apps/api/prisma ./prisma
 
-# Create logs directory for A+++++ architecture
-RUN mkdir -p logs cache && \
-    chown -R counselflow:nodejs /app
+# Create necessary directories with proper permissions
+RUN mkdir -p logs tmp uploads && \
+    chown -R counselflow:nodejs /app && \
+    chmod -R 755 /app
 
 # Switch to non-root user
 USER counselflow
 
-# A+++++ Health check with comprehensive monitoring
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-  CMD curl -f http://localhost:$PORT/api/health || exit 1
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:$PORT/health || exit 1
 
 # Expose port
 EXPOSE $PORT
 
-# Use dumb-init to handle signals properly in A+++++ architecture
+# Use dumb-init for proper signal handling
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start the A+++++ application
-CMD ["node", "dist/index.js"]
+# Start the application with PM2 for production
+CMD ["pm2-runtime", "start", "dist/index.js", "--name", "counselflow-api"]
