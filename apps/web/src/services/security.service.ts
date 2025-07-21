@@ -1,10 +1,10 @@
 // Security Service Implementation
 class SecurityService {
-  private baseUrl: string;
-  private authToken: string;
+  private readonly baseUrl: string;
+  private readonly authToken: string;
 
   constructor() {
-    this.baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+    this.baseUrl = process.env['REACT_APP_API_URL'] || 'http://localhost:3001/api';
     this.authToken = localStorage.getItem('authToken') || '';
   }
 

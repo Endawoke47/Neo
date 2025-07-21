@@ -1,7 +1,7 @@
 // Client Form Modal with Comprehensive Validation
 // Provides a complete form for creating and editing clients with real-time validation
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import FormField, { FormSection, FormGrid, FormActions } from '../ui/FormField';
 import { validateForm, clientValidationSchema, validateFieldRealTime } from '../../utils/validation';
@@ -9,11 +9,11 @@ import { useUsers } from '../../hooks/useApi';
 import { Client } from '../../services/api.service';
 
 interface ClientFormModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (clientData: any) => Promise<{ success: boolean; error?: string }>;
-  client?: Client | null;
-  isLoading?: boolean;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly onSave: (clientData: any) => Promise<{ success: boolean; error?: string }>;
+  readonly client?: Client | null;
+  readonly isLoading?: boolean;
 }
 
 interface ClientFormData {
@@ -152,7 +152,11 @@ export default function ClientFormModal({ isOpen, onClose, onSave, client, isLoa
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         {/* Background overlay */}
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={handleCancel}></div>
+        <button 
+          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+          onClick={handleCancel}
+          aria-label="Close modal"
+        ></button>
 
         {/* Modal panel */}
         <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
@@ -175,9 +179,9 @@ export default function ClientFormModal({ isOpen, onClose, onSave, client, isLoa
           {/* Content */}
           <div className="bg-white px-6 py-6 max-h-96 overflow-y-auto">
             {/* Display submit errors */}
-            {errors.submit && (
+            {errors['submit'] && (
               <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
-                <div className="text-sm text-red-600">{errors.submit}</div>
+                <div className="text-sm text-red-600">{errors['submit']}</div>
               </div>
             )}
 
@@ -193,7 +197,7 @@ export default function ClientFormModal({ isOpen, onClose, onSave, client, isLoa
                     name="name"
                     value={formData.name}
                     onChange={(value) => handleFieldChange('name', value)}
-                    error={errors.name}
+                    error={errors['']}
                     required
                     placeholder="Enter full name or company name"
                   />
@@ -204,7 +208,7 @@ export default function ClientFormModal({ isOpen, onClose, onSave, client, isLoa
                     type="email"
                     value={formData.email}
                     onChange={(value) => handleFieldChange('email', value)}
-                    error={errors.email}
+                    error={errors['']}
                     required
                     placeholder="client@example.com"
                   />
@@ -214,7 +218,7 @@ export default function ClientFormModal({ isOpen, onClose, onSave, client, isLoa
                     name="phone"
                     value={formData.phone}
                     onChange={(value) => handleFieldChange('phone', value)}
-                    error={errors.phone}
+                    error={errors['']}
                     placeholder="+254 700 123 456"
                   />
                   
@@ -225,7 +229,7 @@ export default function ClientFormModal({ isOpen, onClose, onSave, client, isLoa
                     value={formData.clientType}
                     onChange={(value) => handleFieldChange('clientType', value)}
                     options={clientTypes}
-                    error={errors.clientType}
+                    error={errors['']}
                     required
                   />
                 </FormGrid>
@@ -236,7 +240,7 @@ export default function ClientFormModal({ isOpen, onClose, onSave, client, isLoa
                   type="textarea"
                   value={formData.address}
                   onChange={(value) => handleFieldChange('address', value)}
-                  error={errors.address}
+                  error={errors['']}
                   placeholder="Enter complete address"
                   rows={3}
                 />
@@ -255,7 +259,7 @@ export default function ClientFormModal({ isOpen, onClose, onSave, client, isLoa
                     value={formData.industry}
                     onChange={(value) => handleFieldChange('industry', value)}
                     options={industries}
-                    error={errors.industry}
+                    error={errors['']}
                   />
                   
                   <FormField
@@ -264,11 +268,14 @@ export default function ClientFormModal({ isOpen, onClose, onSave, client, isLoa
                     type="select"
                     value={formData.assignedLawyerId}
                     onChange={(value) => handleFieldChange('assignedLawyerId', value)}
-                    options={users.map(user => ({
-                      value: user.id,
-                      label: `${user.firstName} ${user.lastName} ${user.specialization ? `(${user.specialization})` : ''}`
-                    }))}
-                    error={errors.assignedLawyerId}
+                    options={users.map(user => {
+                      const specialization = user.specialization ? `(${user.specialization})` : '';
+                      return {
+                        value: user.id,
+                        label: `${user.firstName} ${user.lastName} ${specialization}`
+                      };
+                    })}
+                    error={errors['']}
                   />
                 </FormGrid>
               </FormSection>
@@ -284,7 +291,7 @@ export default function ClientFormModal({ isOpen, onClose, onSave, client, isLoa
                   type="textarea"
                   value={formData.notes}
                   onChange={(value) => handleFieldChange('notes', value)}
-                  error={errors.notes}
+                  error={errors['']}
                   placeholder="Any additional notes about the client, special requirements, or important information..."
                   rows={4}
                 />

@@ -1,7 +1,7 @@
 // Entity Form Modal with Comprehensive Validation
 // Provides a complete form for creating and editing entities with real-time validation
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import FormField, { FormSection, FormGrid, FormActions } from '../ui/FormField';
 import { validateForm, entityValidationSchema, validateFieldRealTime } from '../../utils/validation';
@@ -9,11 +9,11 @@ import { useClients } from '../../hooks/useApi';
 import { Entity } from '../../services/api.service';
 
 interface EntityFormModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (entityData: any) => Promise<{ success: boolean; error?: string }>;
-  entity?: Entity | null;
-  isLoading?: boolean;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly onSave: (entityData: any) => Promise<{ success: boolean; error?: string }>;
+  readonly entity?: Entity | null;
+  readonly isLoading?: boolean;
 }
 
 interface EntityFormData {
@@ -166,7 +166,11 @@ export default function EntityFormModal({ isOpen, onClose, onSave, entity, isLoa
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         {/* Background overlay */}
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={handleCancel}></div>
+        <button 
+          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+          onClick={handleCancel}
+          aria-label="Close modal"
+        ></button>
 
         {/* Modal panel */}
         <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
@@ -189,9 +193,9 @@ export default function EntityFormModal({ isOpen, onClose, onSave, entity, isLoa
           {/* Content */}
           <div className="bg-white px-6 py-6 max-h-96 overflow-y-auto">
             {/* Display submit errors */}
-            {errors.submit && (
+            {errors['submit'] && (
               <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
-                <div className="text-sm text-red-600">{errors.submit}</div>
+                <div className="text-sm text-red-600">{errors['submit']}</div>
               </div>
             )}
 
@@ -207,7 +211,7 @@ export default function EntityFormModal({ isOpen, onClose, onSave, entity, isLoa
                     name="name"
                     value={formData.name}
                     onChange={(value) => handleFieldChange('name', value)}
-                    error={errors.name}
+                    error={errors['name']}
                     required
                     placeholder="Enter entity name"
                   />
@@ -219,7 +223,7 @@ export default function EntityFormModal({ isOpen, onClose, onSave, entity, isLoa
                     value={formData.type}
                     onChange={(value) => handleFieldChange('type', value)}
                     options={entityTypes}
-                    error={errors.type}
+                    error={errors['type']}
                     required
                   />
                   
@@ -230,7 +234,7 @@ export default function EntityFormModal({ isOpen, onClose, onSave, entity, isLoa
                     value={formData.jurisdiction}
                     onChange={(value) => handleFieldChange('jurisdiction', value)}
                     options={jurisdictions}
-                    error={errors.jurisdiction}
+                    error={errors['jurisdiction']}
                     required
                   />
                   
@@ -241,7 +245,7 @@ export default function EntityFormModal({ isOpen, onClose, onSave, entity, isLoa
                     value={formData.status}
                     onChange={(value) => handleFieldChange('status', value)}
                     options={statusOptions}
-                    error={errors.status}
+                    error={errors['status']}
                     required
                   />
                 </FormGrid>
@@ -259,7 +263,7 @@ export default function EntityFormModal({ isOpen, onClose, onSave, entity, isLoa
                     type="date"
                     value={formData.incorporationDate}
                     onChange={(value) => handleFieldChange('incorporationDate', value)}
-                    error={errors.incorporationDate}
+                    error={errors['incorporationDate']}
                   />
                   
                   <FormField
@@ -268,7 +272,7 @@ export default function EntityFormModal({ isOpen, onClose, onSave, entity, isLoa
                     type="date"
                     value={formData.lastFiling}
                     onChange={(value) => handleFieldChange('lastFiling', value)}
-                    error={errors.lastFiling}
+                    error={errors['lastFiling']}
                   />
                   
                   <FormField
@@ -277,7 +281,7 @@ export default function EntityFormModal({ isOpen, onClose, onSave, entity, isLoa
                     type="number"
                     value={formData.compliance}
                     onChange={(value) => handleFieldChange('compliance', value)}
-                    error={errors.compliance}
+                    error={errors['compliance']}
                     min={0}
                     max={100}
                     step={1}
@@ -289,7 +293,7 @@ export default function EntityFormModal({ isOpen, onClose, onSave, entity, isLoa
                     type="number"
                     value={formData.subsidiaries}
                     onChange={(value) => handleFieldChange('subsidiaries', value)}
-                    error={errors.subsidiaries}
+                    error={errors['subsidiaries']}
                     min={0}
                     step={1}
                   />
@@ -312,7 +316,7 @@ export default function EntityFormModal({ isOpen, onClose, onSave, entity, isLoa
                       value: client.id,
                       label: client.name
                     }))}
-                    error={errors.clientId}
+                    error={errors['clientId']}
                   />
                   
                   <FormField
@@ -320,7 +324,7 @@ export default function EntityFormModal({ isOpen, onClose, onSave, entity, isLoa
                     name="parentEntityId"
                     value={formData.parentEntityId}
                     onChange={(value) => handleFieldChange('parentEntityId', value)}
-                    error={errors.parentEntityId}
+                    error={errors['parentEntityId']}
                     placeholder="Enter parent entity ID"
                   />
                   
@@ -331,7 +335,7 @@ export default function EntityFormModal({ isOpen, onClose, onSave, entity, isLoa
                     value={formData.riskLevel}
                     onChange={(value) => handleFieldChange('riskLevel', value)}
                     options={riskLevels}
-                    error={errors.riskLevel}
+                    error={errors['riskLevel']}
                     required
                   />
                 </FormGrid>

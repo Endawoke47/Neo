@@ -2,7 +2,30 @@
 
 import React, { useState } from 'react';
 import MainLayout from '../../components/layout/MainLayout';
-import { DollarSign, Plus, Search, Download, Upload, Edit3, Trash2, TrendingUp, Users, FileText, BarChart3, PieChart, Target } from 'lucide-react';interface Vendor {  id: string;  name: string;  type: string;  location: string;  status: string;  totalSpend: number;  performanceRating: number;}interface LegalSpend {  id: string;  vendorName: string;  matter: string;  practiceArea: string;  amount: number;  status: string;  invoiceDate: string;  dueDate: string;}export default function OutsourcingLegalSpendPage() {  const [searchTerm, setSearchTerm] = useState('');  const [selectedFilter, setSelectedFilter] = useState('all');  const [activeTab, setActiveTab] = useState('vendors');  const [vendors] = useState<Vendor[]>([    {      id: 'VND001',      name: 'Kaplan & Stratton Advocates',      type: 'Law Firm',      location: 'Nairobi, Kenya',      status: 'Active',      totalSpend: 2850000,      performanceRating: 4.7    },    {      id: 'VND002',      name: 'Muthaura & Associates',      type: 'Boutique Firm',      location: 'Nairobi, Kenya',      status: 'Active',      totalSpend: 1650000,      performanceRating: 4.3    }  ]);  const [legalSpend] = useState<LegalSpend[]>([    {      id: 'INV001',      vendorName: 'Kaplan & Stratton Advocates',      matter: 'TechCorp Acquisition',      practiceArea: 'Corporate Law',      amount: 450000,      status: 'Paid',      invoiceDate: '2024-11-15',      dueDate: '2024-12-15'    },    {      id: 'INV002',      vendorName: 'Muthaura & Associates',      matter: 'Employment Policy Review',      practiceArea: 'Employment Law',      amount: 180000,      status: 'Pending',      invoiceDate: '2024-11-20',      dueDate: '2024-12-05'    }  ]);  const getStatusColor = (status: string) => {    switch (status) {      case 'Active': return 'bg-green-100 text-green-800';      case 'Paid': return 'bg-green-100 text-green-800';      case 'Pending': return 'bg-yellow-100 text-yellow-800';      default: return 'bg-gray-100 text-gray-800';    }  };  const renderStars = (rating: number) => {    return Array.from({ length: 5 }, (_, index) => (      <span        key={index}        className={`text-sm ${index < Math.floor(rating) ? 'text-yellow-400' : 'text-gray-300'}`}      >        ★      </span>    ));  };  const filteredVendors = vendors.filter(vendor => {    const matchesSearch = vendor.name.toLowerCase().includes(searchTerm.toLowerCase());    if (selectedFilter === 'all') return matchesSearch;    return matchesSearch && vendor.status.toLowerCase() === selectedFilter;  });  const filteredSpend = legalSpend.filter(spend => {    const matchesSearch = spend.vendorName.toLowerCase().includes(searchTerm.toLowerCase());    if (selectedFilter === 'all') return matchesSearch;    return matchesSearch && spend.status.toLowerCase() === selectedFilter;  });
+import { DollarSign, Plus, Search, Download, Upload, Edit3, Trash2, Users, FileText } from 'lucide-react';
+
+interface Vendor {  id: string;  name: string;  type: string;  location: string;  status: string;  totalSpend: number;  performanceRating: number;}interface LegalSpend {  id: string;  vendorName: string;  matter: string;  practiceArea: string;  amount: number;  status: string;  invoiceDate: string;  dueDate: string;}export default function OutsourcingLegalSpendPage() {  const [searchTerm, setSearchTerm] = useState('');  const [selectedFilter, setSelectedFilter] = useState('all');  const [activeTab, setActiveTab] = useState('vendors');  const [vendors] = useState<Vendor[]>([    {      id: 'VND001',      name: 'Kaplan & Stratton Advocates',      type: 'Law Firm',      location: 'Nairobi, Kenya',      status: 'Active',      totalSpend: 2850000,      performanceRating: 4.7    },    {      id: 'VND002',      name: 'Muthaura & Associates',      type: 'Boutique Firm',      location: 'Nairobi, Kenya',      status: 'Active',      totalSpend: 1650000,      performanceRating: 4.3    }  ]);  const [legalSpend] = useState<LegalSpend[]>([    {      id: 'INV001',      vendorName: 'Kaplan & Stratton Advocates',      matter: 'TechCorp Acquisition',      practiceArea: 'Corporate Law',      amount: 450000,      status: 'Paid',      invoiceDate: '2024-11-15',      dueDate: '2024-12-15'    },    {      id: 'INV002',      vendorName: 'Muthaura & Associates',      matter: 'Employment Policy Review',      practiceArea: 'Employment Law',      amount: 180000,      status: 'Pending',      invoiceDate: '2024-11-20',      dueDate: '2024-12-05'    }  ]);  const getStatusColor = (status: string) => {    switch (status) {      case 'Active': return 'bg-green-100 text-green-800';      case 'Paid': return 'bg-green-100 text-green-800';      case 'Pending': return 'bg-yellow-100 text-yellow-800';      default: return 'bg-gray-100 text-gray-800';    }  };  const renderStars = (rating: number, vendorId?: string) => {
+    return Array.from({ length: 5 }, (_, index) => (
+      <span
+        key={`star-${vendorId || ''}-${index}`}
+        className={`text-sm ${index < Math.floor(rating) ? 'text-yellow-400' : 'text-gray-300'}`}
+      >
+        ★
+      </span>
+    ));
+  };
+
+  const filteredVendors = vendors.filter(vendor => {
+    const matchesSearch = vendor.name.toLowerCase().includes(searchTerm.toLowerCase());
+    if (selectedFilter === 'all') return matchesSearch;
+    return matchesSearch && vendor.status.toLowerCase() === selectedFilter;
+  });
+
+  const filteredSpend = legalSpend.filter(spend => {
+    const matchesSearch = spend.vendorName.toLowerCase().includes(searchTerm.toLowerCase());
+    if (selectedFilter === 'all') return matchesSearch;
+    return matchesSearch && spend.status.toLowerCase() === selectedFilter;
+  });
 
   return (
     <MainLayout>
@@ -176,7 +199,7 @@ import { DollarSign, Plus, Search, Download, Upload, Edit3, Trash2, TrendingUp, 
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          {renderStars(vendor.performanceRating)}
+                          {renderStars(vendor.performanceRating, vendor.id)}
                           <span className="ml-2 text-sm text-gray-600">{vendor.performanceRating}</span>
                         </div>
                       </td>

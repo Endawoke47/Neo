@@ -1,4 +1,4 @@
-// CounselFlow Neo - Simplified Schema for SQLite Development
+// CounselFlow Neo - Optimized Schema for SQLite Development
 
 generator client {
   provider = "prisma-client-js"
@@ -50,7 +50,15 @@ model User {
   matters                     Matter[]
   contracts                   Contract[]
   documents                   Document[]
+  auditLogs                   AuditLog[]
   
+  // Performance Indexes
+  @@index([email])
+  @@index([status])
+  @@index([role])
+  @@index([createdAt])
+  @@index([lastLoginAt])
+  @@index([isEmailVerified])
   @@map("users")
 }
 
@@ -66,6 +74,12 @@ model Session {
   
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   
+  // Performance Indexes
+  @@index([userId])
+  @@index([isActive])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@index([userId, isActive])
   @@map("sessions")
 }
 
@@ -101,6 +115,13 @@ model Client {
   contracts           Contract[]
   documents           Document[]
   
+  // Performance Indexes
+  @@index([email])
+  @@index([status])
+  @@index([clientType])
+  @@index([assignedLawyerId])
+  @@index([createdAt])
+  @@index([industry])
   @@map("clients")
 }
 
@@ -144,6 +165,16 @@ model Matter {
   contracts         Contract[]
   documents         Document[]
   
+  // Performance Indexes
+  @@index([type])
+  @@index([status])
+  @@index([priority])
+  @@index([riskLevel])
+  @@index([clientId])
+  @@index([assignedLawyerId])
+  @@index([createdAt])
+  @@index([status, priority])
+  @@index([clientId, status])
   @@map("matters")
 }
 
@@ -191,6 +222,17 @@ model Contract {
   matter            Matter?       @relation(fields: [matterId], references: [id])
   documents         Document[]
   
+  // Performance Indexes
+  @@index([type])
+  @@index([status])
+  @@index([priority])
+  @@index([clientId])
+  @@index([assignedLawyerId])
+  @@index([matterId])
+  @@index([createdAt])
+  @@index([endDate])
+  @@index([status, priority])
+  @@index([clientId, status])
   @@map("contracts")
 }
 
@@ -240,5 +282,57 @@ model Document {
   parentDocument    Document?     @relation("DocumentVersions", fields: [parentDocumentId], references: [id])
   childDocuments    Document[]    @relation("DocumentVersions")
   
+  // Performance Indexes
+  @@index([type])
+  @@index([uploadedById])
+  @@index([clientId])
+  @@index([matterId])
+  @@index([contractId])
+  @@index([createdAt])
+  @@index([isConfidential])
+  @@index([accessLevel])
   @@map("documents")
+}
+
+// Performance and Security Enhancement: Audit Log
+model AuditLog {
+  id              String    @id @default(cuid())
+  
+  // Audit Information
+  action          String    // CREATE, UPDATE, DELETE, LOGIN, LOGOUT, ACCESS, etc.
+  entityType      String    // USER, CLIENT, MATTER, CONTRACT, DOCUMENT, etc.
+  entityId        String    // ID of the affected entity
+  
+  // Change Details
+  oldValues       String?   // JSON string of old values
+  newValues       String?   // JSON string of new values
+  changedFields   String?   // List of changed field names
+  
+  // User and Context
+  userId          String?
+  userEmail       String?
+  ipAddress       String?
+  userAgent       String?
+  
+  // Additional Context
+  description     String?   // Human-readable description
+  severity        String    @default("INFO") // DEBUG, INFO, WARN, ERROR, CRITICAL
+  metadata        String?   // Additional JSON metadata
+  
+  // Timestamps
+  timestamp       DateTime  @default(now())
+  
+  // Relations
+  user            User?     @relation(fields: [userId], references: [id])
+  
+  // Performance Indexes
+  @@index([action])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([userId])
+  @@index([timestamp])
+  @@index([severity])
+  @@index([action, entityType])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
 }

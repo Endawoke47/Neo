@@ -10,31 +10,30 @@ import {
   Mail, 
   Video, 
   BookOpen, 
-  FileText, 
   Download, 
   ExternalLink,
-  Clock,
-  CheckCircle,
-  AlertCircle,
-  Star,
   ThumbsUp,
   ThumbsDown,
   Send,
-  Mic,
-  Camera,
-  Calendar,
-  Users,
-  Bot,
-  Zap,
-  Shield,
   Globe,
-  Headphones,
   Play,
   ChevronRight,
   ChevronDown,
-  Plus,
-  Filter
+  Plus
 } from 'lucide-react';
+
+// Helper functions to replace nested ternary operations
+const getServiceStatusDotColor = (status: string) => {
+  if (status === 'Online') return 'bg-green-500';
+  if (status === 'Maintenance') return 'bg-yellow-500';
+  return 'bg-red-500';
+};
+
+const getServiceStatusBadgeColor = (status: string) => {
+  if (status === 'Online') return 'bg-green-100 text-green-800';
+  if (status === 'Maintenance') return 'bg-yellow-100 text-yellow-800';
+  return 'bg-red-100 text-red-800';
+};
 
 interface FAQ {
   id: string;
@@ -409,7 +408,7 @@ export default function HelpSupportPage() {
                     level: 'Beginner'
                   }
                 ].map((guide, index) => (
-                  <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition-shadow p-6">
+                  <div key={`guide-${guide.title.replace(/\s+/g, '-').toLowerCase()}-${index}`} className="bg-white rounded-lg shadow-sm border border-gray-200 cursor-pointer hover:shadow-md transition-shadow p-6">
                     <div className="flex items-start justify-between mb-3">
                       <BookOpen className="w-8 h-8 text-primary-600" />
                       <span className="inline-block px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded-full">{guide.level}</span>
@@ -508,7 +507,7 @@ export default function HelpSupportPage() {
                       { name: 'Desktop App - macOS', size: '98 MB' },
                       { name: 'Browser Extension', size: '2 MB' }
                     ].map((download, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div key={`download-${download.name.replace(/\s+/g, '-').toLowerCase()}-${index}`} className="flex items-center justify-between p-3 border rounded-lg">
                         <div>
                           <p className="font-medium">{download.name}</p>
                           <p className="text-sm text-gray-500">{download.size}</p>
@@ -537,7 +536,7 @@ export default function HelpSupportPage() {
                       { name: 'Feature Requests', url: 'https://feedback.counselflow.com' },
                       { name: 'Status Page', url: 'https://status.counselflow.com' }
                     ].map((link, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div key={`link-${link.name.replace(/\s+/g, '-').toLowerCase()}-${index}`} className="flex items-center justify-between p-3 border rounded-lg">
                         <p className="font-medium">{link.name}</p>
                         <button className="flex items-center px-3 py-1 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors">
                           <ExternalLink className="w-4 h-4 mr-1" />
@@ -570,22 +569,15 @@ export default function HelpSupportPage() {
                         { service: 'File Storage', status: 'Maintenance', uptime: '99.92%' },
                         { service: 'API Endpoints', status: 'Operational', uptime: '99.94%' }
                       ].map((service, index) => (
-                        <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div key={`service-${service.service.replace(/\s+/g, '-').toLowerCase()}-${index}`} className="flex items-center justify-between p-4 border rounded-lg">
                           <div className="flex items-center">
-                            <div className={`w-3 h-3 rounded-full mr-3 ${
-                              service.status === 'Operational' ? 'bg-green-500' : 
-                              service.status === 'Maintenance' ? 'bg-yellow-500' : 'bg-red-500'
-                            }`} />
+                            <div className={`w-3 h-3 rounded-full mr-3 ${getServiceStatusDotColor(service.status)}`} />
                             <div>
                               <p className="font-medium">{service.service}</p>
                               <p className="text-sm text-gray-500">Uptime: {service.uptime}</p>
                             </div>
                           </div>
-                          <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
-                            service.status === 'Operational' ? 'bg-green-100 text-green-800' : 
-                            service.status === 'Maintenance' ? 'bg-yellow-100 text-yellow-800' : 
-                            'bg-red-100 text-red-800'
-                          }`}>
+                          <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${getServiceStatusBadgeColor(service.status)}`}>
                             {service.status}
                           </span>
                         </div>
@@ -609,16 +601,17 @@ export default function HelpSupportPage() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                      <label htmlFor="support-subject" className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
                       <input 
                         type="text"
+                        id="support-subject"
                         placeholder="Brief description of your issue"
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                      <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                      <label htmlFor="support-category" className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                      <select id="support-category" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
                         <option value="">Select category</option>
                         <option value="technical">Technical Issue</option>
                         <option value="billing">Billing Question</option>
@@ -628,8 +621,8 @@ export default function HelpSupportPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                      <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                      <label htmlFor="support-priority" className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                      <select id="support-priority" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
                         <option value="">Select priority</option>
                         <option value="low">Low</option>
                         <option value="medium">Medium</option>
@@ -638,8 +631,8 @@ export default function HelpSupportPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Contact Method</label>
-                      <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                      <label htmlFor="support-contact-method" className="block text-sm font-medium text-gray-700 mb-1">Contact Method</label>
+                      <select id="support-contact-method" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
                         <option value="">Preferred contact</option>
                         <option value="email">Email</option>
                         <option value="phone">Phone</option>
@@ -648,8 +641,9 @@ export default function HelpSupportPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                    <label htmlFor="support-message" className="block text-sm font-medium text-gray-700 mb-1">Message</label>
                     <textarea 
+                      id="support-message"
                       placeholder="Please describe your issue in detail..." 
                       rows={5}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"

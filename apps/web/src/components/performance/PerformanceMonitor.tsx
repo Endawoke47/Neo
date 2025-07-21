@@ -18,8 +18,8 @@ interface PerformanceMetrics {
 }
 
 interface PerformanceMonitorProps {
-  enableDevMode?: boolean;
-  onMetricsUpdate?: (metrics: Partial<PerformanceMetrics>) => void;
+  readonly enableDevMode?: boolean;
+  readonly onMetricsUpdate?: (metrics: Partial<PerformanceMetrics>) => void;
 }
 
 export function PerformanceMonitor({ 
@@ -71,9 +71,12 @@ export function PerformanceMonitor({
       // First Input Delay
       const fidObserver = new PerformanceObserver((list) => {
         for (const entry of list.getEntries()) {
-          const fid = entry.processingStart - entry.startTime;
-          setMetrics(prev => ({ ...prev, firstInputDelay: fid }));
-          onMetricsUpdate?.({ firstInputDelay: fid });
+          const eventEntry = entry as PerformanceEntry & { processingStart?: number };
+          if (eventEntry.processingStart) {
+            const fid = eventEntry.processingStart - entry.startTime;
+            setMetrics(prev => ({ ...prev, firstInputDelay: fid }));
+            onMetricsUpdate?.({ firstInputDelay: fid });
+          }
         }
       });
       fidObserver.observe({ entryTypes: ['first-input'] });

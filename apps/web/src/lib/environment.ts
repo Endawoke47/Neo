@@ -77,7 +77,9 @@ function getEnvVar<T>(
     try {
       return transformer(value);
     } catch (error) {
-      throw new Error(`Invalid value for environment variable ${key}: ${value}`);
+      const message = `Invalid value for environment variable ${key}: ${value}`;
+      console.error(message, error);
+      throw new Error(message);
     }
   }
 
@@ -133,11 +135,11 @@ function validateRequiredEnvVars(): void {
   }
 
   // Validate JWT secrets are not default values
-  if (process.env.JWT_SECRET === 'your-super-secure-jwt-secret-key-change-this-in-production') {
+  if (process.env['JWT_SECRET'] === 'your-super-secure-jwt-secret-key-change-this-in-production') {
     throw new Error('JWT_SECRET is using default value. Please set a secure secret key.');
   }
 
-  if (process.env.JWT_REFRESH_SECRET === 'your-super-secure-refresh-secret-key-change-this-in-production') {
+  if (process.env['JWT_REFRESH_SECRET'] === 'your-super-secure-refresh-secret-key-change-this-in-production') {
     throw new Error('JWT_REFRESH_SECRET is using default value. Please set a secure secret key.');
   }
 }
@@ -146,12 +148,13 @@ function validateRequiredEnvVars(): void {
  * Load and validate environment configuration
  */
 export function loadEnvironmentConfig(): EnvironmentConfig {
-  // Validate required variables first
-  if (process.env.NODE_ENV !== 'test') {
-    validateRequiredEnvVars();
-  }
+  try {
+    // Validate required variables first
+    if (process.env['NODE_ENV'] !== 'test') {
+      validateRequiredEnvVars();
+    }
 
-  return {
+    return {
     // Application
     NODE_ENV: getEnvVar('NODE_ENV', 'development') as 'development' | 'production' | 'test',
     APP_NAME: getEnvVar('APP_NAME', 'CounselFlow'),
@@ -167,13 +170,13 @@ export function loadEnvironmentConfig(): EnvironmentConfig {
     DATABASE_URL: getEnvVar('DATABASE_URL'),
 
     // Redis
-    REDIS_URL: getEnvVar('REDIS_URL', undefined),
+    REDIS_URL: getEnvVar('REDIS_URL'),
 
     // Email
-    SMTP_HOST: getEnvVar('SMTP_HOST', undefined),
+    SMTP_HOST: getEnvVar('SMTP_HOST'),
     SMTP_PORT: getIntEnv('SMTP_PORT', 587),
-    SMTP_USER: getEnvVar('SMTP_USER', undefined),
-    SMTP_PASS: getEnvVar('SMTP_PASS', undefined),
+    SMTP_USER: getEnvVar('SMTP_USER'),
+    SMTP_PASS: getEnvVar('SMTP_PASS'),
     EMAIL_FROM: getEnvVar('EMAIL_FROM', 'CounselFlow <noreply@counselflow.com>'),
 
     // Security
@@ -193,16 +196,20 @@ export function loadEnvironmentConfig(): EnvironmentConfig {
     ENABLE_AI_FEATURES: getBooleanEnv('ENABLE_AI_FEATURES', true),
 
     // External Services
-    OPENAI_API_KEY: getEnvVar('OPENAI_API_KEY', undefined),
-    AWS_ACCESS_KEY_ID: getEnvVar('AWS_ACCESS_KEY_ID', undefined),
-    AWS_SECRET_ACCESS_KEY: getEnvVar('AWS_SECRET_ACCESS_KEY', undefined),
+    OPENAI_API_KEY: getEnvVar('OPENAI_API_KEY'),
+    AWS_ACCESS_KEY_ID: getEnvVar('AWS_ACCESS_KEY_ID'),
+    AWS_SECRET_ACCESS_KEY: getEnvVar('AWS_SECRET_ACCESS_KEY'),
     AWS_REGION: getEnvVar('AWS_REGION', 'us-east-1'),
-    AWS_S3_BUCKET: getEnvVar('AWS_S3_BUCKET', undefined),
+    AWS_S3_BUCKET: getEnvVar('AWS_S3_BUCKET'),
 
     // Monitoring
     LOG_LEVEL: getEnvVar('LOG_LEVEL', 'info') as 'error' | 'warn' | 'info' | 'debug',
     ENABLE_REQUEST_LOGGING: getBooleanEnv('ENABLE_REQUEST_LOGGING', true),
   };
+  } catch (error) {
+    console.error('Failed to load environment configuration:', error);
+    throw error;
+  }
 }
 
 // Export the configuration instance

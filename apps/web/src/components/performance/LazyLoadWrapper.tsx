@@ -9,10 +9,10 @@ import React, { Suspense, lazy } from 'react';
 import { LoadingSkeleton } from '../ui/LoadingSkeleton';
 
 interface LazyLoadWrapperProps {
-  children: React.ReactNode;
-  fallback?: React.ReactNode;
-  minHeight?: string;
-  className?: string;
+  readonly children: React.ReactNode;
+  readonly fallback?: React.ReactNode;
+  readonly minHeight?: string;
+  readonly className?: string;
 }
 
 export function LazyLoadWrapper({ 
@@ -64,7 +64,7 @@ export function withPerformance<P extends object>(
   
   const PerformanceWrapper = React.memo(
     React.forwardRef<any, P>((props, ref) => {
-      return <Component {...props} ref={ref} />;
+      return <Component {...(props as P)} ref={ref} />;
     })
   );
   

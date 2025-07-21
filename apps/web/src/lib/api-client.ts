@@ -5,11 +5,11 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
 class ApiClient {
-  private client: AxiosInstance;
+  private readonly client: AxiosInstance;
 
   constructor() {
     this.client = axios.create({
-      baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005/api/v1',
+      baseURL: process.env['NEXT_PUBLIC_API_URL'] || 'http://localhost:3005/api/v1',
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',

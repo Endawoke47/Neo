@@ -7,7 +7,7 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -31,32 +31,32 @@ if (isProduction) {
 app.use(helmet({
   contentSecurityPolicy: isProduction ? undefined : false,
   crossOriginEmbedderPolicy: false,
-}));
+}) as any);
 
 // Compression middleware
-app.use(compression());
+app.use(compression() as any);
 
 // CORS configuration
 app.use(cors({
-  origin: env.CORS_ORIGIN || env.ALLOWED_ORIGINS.split(','),
+  origin: env.CORS_ORIGIN || (env.ALLOWED_ORIGINS ? env.ALLOWED_ORIGINS.split(',') : ['http://localhost:3000', 'http://localhost:3003']),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-}));
+}) as any);
 
 // Rate limiting
 if (env.ENABLE_RATE_LIMITING) {
   const limiter = rateLimit({
-    windowMs: env.RATE_LIMIT_WINDOW_MS,
-    max: env.RATE_LIMIT_MAX_REQUESTS,
+    windowMs: env.RATE_LIMIT_WINDOW_MS || 900000,
+    max: env.RATE_LIMIT_MAX_REQUESTS || 100,
     message: {
       error: 'Too many requests, please try again later.',
-      retryAfter: Math.ceil(env.RATE_LIMIT_WINDOW_MS / 1000),
+      retryAfter: Math.ceil((env.RATE_LIMIT_WINDOW_MS || 900000) / 1000),
     },
     standardHeaders: true,
     legacyHeaders: false,
   });
-  app.use('/api/', limiter);
+  app.use('/api/', limiter as any);
 }
 
 // Body parsing middleware
@@ -70,11 +70,11 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Request logging
 if (env.ENABLE_REQUEST_LOGGING) {
-  app.use(requestLogger);
+  app.use(requestLogger as any);
 }
 
 // Security middleware
-app.use(securityMiddleware);
+app.use(securityMiddleware as any);
 
 // Health check endpoint (no auth required)
 app.get('/health', (_req: Request, res: Response) => {

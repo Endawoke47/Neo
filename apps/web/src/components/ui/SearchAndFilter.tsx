@@ -50,7 +50,7 @@ export default function SearchAndFilter({
             disabled={disabled}
             aria-label={filterLabel}
           >
-            {filterOptions.map((option) => (
+            {(filterOptions || []).map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

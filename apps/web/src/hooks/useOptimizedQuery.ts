@@ -124,7 +124,7 @@ export function useOptimizedPagination<T>(
   const queryClient = useQueryClient();
 
   const query = useOptimizedQuery({
-    queryKey: ['paginated-data', currentPage, pageSize],
+    queryKey: ['paginated-data', currentPage.toString(), pageSize.toString()],
     queryFn: () => fetchFn(currentPage, pageSize),
     staleTime: 30 * 1000, // 30 seconds
   });
@@ -133,7 +133,7 @@ export function useOptimizedPagination<T>(
   useEffect(() => {
     if (prefetchNext && query.data && currentPage * pageSize < query.data.total) {
       queryClient.prefetchQuery({
-        queryKey: ['paginated-data', currentPage + 1, pageSize],
+        queryKey: ['paginated-data', (currentPage + 1).toString(), pageSize.toString()],
         queryFn: () => fetchFn(currentPage + 1, pageSize),
       });
     }

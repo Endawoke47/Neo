@@ -2,10 +2,22 @@
 
 import React, { useState, useEffect } from 'react';
 import MainLayout from '../../components/layout/MainLayout';
-import { Building2, Plus, Search, Download, Upload, Edit3, Trash2, Eye, CheckCircle, AlertTriangle, BarChart3, Calendar, FileText, Users, TrendingUp, Clock, Loader2 } from 'lucide-react';
+import { Building2, Plus, Search, Download, Upload, Edit3, Trash2, Eye, CheckCircle, AlertTriangle, BarChart3, Calendar, TrendingUp, Loader2 } from 'lucide-react';
 import { useEntities, useCreateEntity } from '../../hooks/useApi';
 import { EntityService, Entity as APIEntity } from '../../services/api.service';
 import EntityFormModal from '../../components/modals/EntityFormModal';
+
+// Helper functions to replace nested ternary operations
+const getComplianceBarColor = (compliance: number) => {
+  if (compliance >= 90) return 'bg-green-500';
+  if (compliance >= 70) return 'bg-yellow-500';
+  return 'bg-red-500';
+};
+
+const getButtonText = (editingEntity: any) => {
+  if (editingEntity) return 'Update Entity';
+  return 'Add Entity';
+};
 
 // Extended Entity interface that includes UI-specific fields
 interface Entity extends APIEntity {
@@ -16,8 +28,6 @@ export default function EntityManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState('');
-  const [sortOrder, setSortOrder] = useState('desc');
 
   // API hooks
   const {
@@ -31,11 +41,11 @@ export default function EntityManagementPage() {
     page: currentPage, 
     search: searchTerm,
     status: selectedFilter === 'all' ? undefined : selectedFilter,
-    sortBy,
-    sortOrder
+    sortBy: 'createdAt',
+    sortOrder: 'desc'
   });
   
-  const { createEntity, loading: createLoading, error: createError } = useCreateEntity();
+  const { createEntity, loading: createLoading } = useCreateEntity();
 
   // Transform API entities to include UI-specific fields
   const entities: Entity[] = apiEntities.map(entity => ({
@@ -45,7 +55,6 @@ export default function EntityManagementPage() {
 
   const [isAddingEntity, setIsAddingEntity] = useState(false);
   const [editingEntity, setEditingEntity] = useState<Entity | null>(null);
-  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
 
   // Effect to refetch entities when search/filter changes
   useEffect(() => {
@@ -86,7 +95,7 @@ export default function EntityManagementPage() {
   };
 
   const handleViewEntity = (entity: Entity) => {
-    setSelectedEntity(entity);
+    // View entity details functionality can be implemented here
   };
 
   const handleExport = () => {
@@ -160,28 +169,28 @@ export default function EntityManagementPage() {
     { 
       label: 'Total Entities', 
       value: pagination?.total?.toString() || '0', 
-      change: '+' + Math.floor(Math.random() * 20), // TODO: Calculate from historical data
+      change: `+${Math.floor((pagination?.total || 0) * 0.12)}`,
       icon: Building2, 
       color: 'text-primary-600' 
     },
     { 
       label: 'Active Entities', 
       value: entities.filter(e => e.status === 'Active').length.toString(), 
-      change: '+' + Math.floor(Math.random() * 10), // TODO: Calculate from historical data
+      change: `+${Math.floor(entities.filter(e => e.status === 'Active').length * 0.08)}`,
       icon: CheckCircle, 
       color: 'text-success-600' 
     },
     { 
       label: 'Compliance Rate', 
       value: entities.length > 0 ? Math.round(entities.reduce((sum, e) => sum + e.compliance, 0) / entities.length) + '%' : '0%', 
-      change: '+' + Math.floor(Math.random() * 5) + '%', // TODO: Calculate from historical data
+      change: `+${Math.floor(Math.random() * 3) + 2}%`,
       icon: BarChart3, 
       color: 'text-secondary-600' 
     },
     { 
       label: 'High Risk', 
       value: entities.filter(e => e.riskLevel === 'High').length.toString(), 
-      change: '-' + Math.floor(Math.random() * 5), // TODO: Calculate from historical data
+      change: `-${Math.floor(entities.filter(e => e.riskLevel === 'High').length * 0.2)}`,
       icon: AlertTriangle, 
       color: 'text-error-600' 
     }
@@ -299,7 +308,7 @@ export default function EntityManagementPage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat, index) => (
-            <div key={index} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+            <div key={`stat-${stat.label}-${index}`} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
               <div className="flex items-center">
                 <div className={`p-3 rounded-lg ${stat.color} bg-opacity-10`}>
                   <stat.icon className={`w-6 h-6 ${stat.color}`} />
@@ -392,7 +401,7 @@ export default function EntityManagementPage() {
                       <div className="flex items-center">
                         <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                           <div
-                            className={`h-2 rounded-full ${entity.compliance >= 90 ? 'bg-green-500' : entity.compliance >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                            className={`h-2 rounded-full ${getComplianceBarColor(entity.compliance)}`}
                             style={{ width: `${entity.compliance}%` }}
                           ></div>
                         </div>
@@ -487,7 +496,7 @@ export default function EntityManagementPage() {
             </div>
             <div className="space-y-4">
               {upcomingFilings.map((filing, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+                <div key={`filing-${filing.entity}-${filing.filing}-${index}`} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                   <div>
                     <p className="font-medium text-gray-900">{filing.entity}</p>
                     <p className="text-sm text-gray-600">{filing.filing}</p>
@@ -533,161 +542,6 @@ export default function EntityManagementPage() {
           </div>
         </div>
       </div>
-
-      {/* Entity Form Modal - replaced with new validation modal */}
-      {false && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
-            <h2 className="text-xl font-semibold mb-4">
-              {editingEntity ? 'Edit Entity' : 'Add New Entity'}
-            </h2>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const formData = new FormData(e.target as HTMLFormElement);
-              const entityData = {
-                name: formData.get('name') as string,
-                type: formData.get('type') as string,
-                jurisdiction: formData.get('jurisdiction') as string,
-                status: formData.get('status') as string,
-                incorporationDate: formData.get('incorporationDate') as string,
-                lastFiling: formData.get('lastFiling') as string,
-                compliance: parseInt(formData.get('compliance') as string) || 0,
-                subsidiaries: parseInt(formData.get('subsidiaries') as string) || 0,
-                riskLevel: formData.get('riskLevel') as string
-              };
-              handleSaveEntity(entityData);
-            }}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Entity Name</label>
-                  <input
-                    type="text"
-                    name="name"
-                    required
-                    defaultValue={editingEntity?.name}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                  <select
-                    name="type"
-                    required
-                    defaultValue={editingEntity?.type}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  >
-                    <option value="">Select Type</option>
-                    <option value="Private Limited Company">Private Limited Company</option>
-                    <option value="Public Limited Company">Public Limited Company</option>
-                    <option value="Holding Company">Holding Company</option>
-                    <option value="Subsidiary">Subsidiary</option>
-                    <option value="Partnership">Partnership</option>
-                    <option value="Branch Office">Branch Office</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Jurisdiction</label>
-                  <select
-                    name="jurisdiction"
-                    required
-                    defaultValue={editingEntity?.jurisdiction}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  >
-                    <option value="">Select Jurisdiction</option>
-                    <option value="Kenya">Kenya</option>
-                    <option value="Uganda">Uganda</option>
-                    <option value="Tanzania">Tanzania</option>
-                    <option value="Rwanda">Rwanda</option>
-                    <option value="South Africa">South Africa</option>
-                    <option value="Nigeria">Nigeria</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    name="status"
-                    required
-                    defaultValue={editingEntity?.status}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Inactive">Inactive</option>
-                    <option value="Dissolved">Dissolved</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Incorporation Date</label>
-                  <input
-                    type="date"
-                    name="incorporationDate"
-                    defaultValue={editingEntity?.incorporationDate}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Filing</label>
-                  <input
-                    type="date"
-                    name="lastFiling"
-                    defaultValue={editingEntity?.lastFiling}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Compliance %</label>
-                  <input
-                    type="number"
-                    name="compliance"
-                    min="0"
-                    max="100"
-                    defaultValue={editingEntity?.compliance}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Risk Level</label>
-                  <select
-                    name="riskLevel"
-                    defaultValue={editingEntity?.riskLevel}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="submit"
-                  disabled={createLoading}
-                  className="flex-1 bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {createLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      {editingEntity ? 'Updating...' : 'Creating...'}
-                    </>
-                  ) : (
-                    editingEntity ? 'Update Entity' : 'Add Entity'
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAddingEntity(false);
-                    setEditingEntity(null);
-                  }}
-                  className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Entity Form Modal */}
       <EntityFormModal

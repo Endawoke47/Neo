@@ -22,6 +22,31 @@ interface Policy {
   description: string;
 }
 
+// Helper functions for nested ternary operations
+const getPolicyComplianceBarColor = (compliance: number) => {
+  if (compliance >= 95) return 'bg-green-500';
+  if (compliance >= 85) return 'bg-yellow-500';
+  return 'bg-red-500';
+};
+
+const getReviewPriorityColor = (priority: string) => {
+  if (priority === 'High') return 'bg-red-100 text-red-800';
+  if (priority === 'Medium') return 'bg-yellow-100 text-yellow-800';
+  return 'bg-green-100 text-green-800';
+};
+
+const getPolicyStatusDotColor = (status: string) => {
+  if (status === 'Active') return 'bg-green-500';
+  if (status === 'Under Review') return 'bg-yellow-500';
+  return 'bg-gray-500';
+};
+
+const getPolicyStatusMessage = (status: string) => {
+  if (status === 'Active') return 'Currently Active';
+  if (status === 'Under Review') return 'Under Review';
+  return 'Draft Status';
+};
+
 export default function PolicyManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
@@ -274,7 +299,7 @@ export default function PolicyManagementPage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat, index) => (
-            <div key={index} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+            <div key={`policy-stat-${stat.label}-${index}`} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
               <div className="flex items-center">
                 <div className={`p-3 rounded-lg ${stat.color} bg-opacity-10`}>
                   <stat.icon className={`w-6 h-6 ${stat.color}`} />
@@ -374,7 +399,7 @@ export default function PolicyManagementPage() {
                       <div className="flex items-center">
                         <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                           <div 
-                            className={`h-2 rounded-full ${policy.compliance >= 95 ? 'bg-green-500' : policy.compliance >= 85 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                            className={`h-2 rounded-full ${getPolicyComplianceBarColor(policy.compliance)}`}
                             style={{ width: `${policy.compliance}%` }}
                           ></div>
                         </div>
@@ -434,8 +459,8 @@ export default function PolicyManagementPage() {
               <button className="text-sm text-primary-600 hover:text-primary-800">View Details</button>
             </div>
             <div className="space-y-4">
-              {policyCategories.map((category, index) => (
-                <div key={index} className="space-y-2">
+              {policyCategories.map((category) => (
+                <div key={category.category} className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-gray-900">{category.category}</span>
                     <span className="text-sm text-gray-600">{category.count} policies ({category.percentage}%)</span>
@@ -468,16 +493,12 @@ export default function PolicyManagementPage() {
               <button className="text-sm text-primary-600 hover:text-primary-800">View All</button>
             </div>
             <div className="space-y-4">
-              {upcomingReviews.map((review, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+              {upcomingReviews.map((review) => (
+                <div key={review.policy} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                   <div>
                     <p className="font-medium text-gray-900">{review.policy}</p>
                     <p className="text-sm text-gray-600">{review.owner}</p>
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      review.priority === 'High' ? 'bg-red-100 text-red-800' :
-                      review.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-green-100 text-green-800'
-                    }`}>
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getReviewPriorityColor(review.priority)}`}>
                       {review.priority}
                     </span>
                   </div>
@@ -528,19 +549,21 @@ export default function PolicyManagementPage() {
             }}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Policy Title</label>
+                  <label htmlFor="policy-title" className="block text-sm font-medium text-gray-700 mb-1">Policy Title</label>
                   <input
                     type="text"
                     name="title"
+                    id="policy-title"
                     required
                     defaultValue={editingPolicy?.title}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                  <label htmlFor="policy-type" className="block text-sm font-medium text-gray-700 mb-1">Type</label>
                   <select
                     name="type"
+                    id="policy-type"
                     required
                     defaultValue={editingPolicy?.type}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
@@ -553,28 +576,31 @@ export default function PolicyManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <label htmlFor="policy-category" className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                   <input
                     type="text"
                     name="category"
+                    id="policy-category"
                     required
                     defaultValue={editingPolicy?.category}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Version</label>
+                  <label htmlFor="policy-version" className="block text-sm font-medium text-gray-700 mb-1">Version</label>
                   <input
                     type="text"
                     name="version"
+                    id="policy-version"
                     defaultValue={editingPolicy?.version || 'v1.0'}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <label htmlFor="policy-status" className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                   <select
                     name="status"
+                    id="policy-status"
                     required
                     defaultValue={editingPolicy?.status}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
@@ -586,68 +612,75 @@ export default function PolicyManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Effective Date</label>
+                  <label htmlFor="policy-effective-date" className="block text-sm font-medium text-gray-700 mb-1">Effective Date</label>
                   <input
                     type="date"
                     name="effectiveDate"
+                    id="policy-effective-date"
                     required
                     defaultValue={editingPolicy?.effectiveDate}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
+                  <label htmlFor="policy-expiry-date" className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
                   <input
                     type="date"
                     name="expiryDate"
+                    id="policy-expiry-date"
                     defaultValue={editingPolicy?.expiryDate}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Review Date</label>
+                  <label htmlFor="policy-review-date" className="block text-sm font-medium text-gray-700 mb-1">Review Date</label>
                   <input
                     type="date"
                     name="reviewDate"
+                    id="policy-review-date"
                     defaultValue={editingPolicy?.reviewDate}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Policy Owner</label>
+                  <label htmlFor="policy-owner" className="block text-sm font-medium text-gray-700 mb-1">Policy Owner</label>
                   <input
                     type="text"
                     name="owner"
+                    id="policy-owner"
                     required
                     defaultValue={editingPolicy?.owner}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Approver</label>
+                  <label htmlFor="policy-approver" className="block text-sm font-medium text-gray-700 mb-1">Approver</label>
                   <input
                     type="text"
                     name="approver"
+                    id="policy-approver"
                     required
                     defaultValue={editingPolicy?.approver}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                  <label htmlFor="policy-department" className="block text-sm font-medium text-gray-700 mb-1">Department</label>
                   <input
                     type="text"
                     name="department"
+                    id="policy-department"
                     required
                     defaultValue={editingPolicy?.department}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Compliance Score (%)</label>
+                  <label htmlFor="policy-compliance-score" className="block text-sm font-medium text-gray-700 mb-1">Compliance Score (%)</label>
                   <input
                     type="number"
                     name="compliance"
+                    id="policy-compliance-score"
                     min="0"
                     max="100"
                     defaultValue={editingPolicy?.compliance}
@@ -655,9 +688,10 @@ export default function PolicyManagementPage() {
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <label htmlFor="policy-description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                   <textarea
                     name="description"
+                    id="policy-description"
                     rows={3}
                     defaultValue={editingPolicy?.description}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
@@ -745,7 +779,7 @@ export default function PolicyManagementPage() {
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
-                        className={`h-2 rounded-full ${selectedPolicy.compliance >= 95 ? 'bg-green-500' : selectedPolicy.compliance >= 85 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                        className={`h-2 rounded-full ${getPolicyComplianceBarColor(selectedPolicy.compliance)}`}
                         style={{ width: `${selectedPolicy.compliance}%` }}
                       ></div>
                     </div>
@@ -807,9 +841,9 @@ export default function PolicyManagementPage() {
                   <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Policy Status</h3>
                   <div className="mt-2 space-y-2">
                     <div className="flex items-center space-x-2">
-                      <div className={`w-3 h-3 rounded-full ${selectedPolicy.status === 'Active' ? 'bg-green-500' : selectedPolicy.status === 'Under Review' ? 'bg-yellow-500' : 'bg-gray-500'}`}></div>
+                      <div className={`w-3 h-3 rounded-full ${getPolicyStatusDotColor(selectedPolicy.status)}`}></div>
                       <span className="text-sm text-gray-600">
-                        {selectedPolicy.status === 'Active' ? 'Currently Active' : selectedPolicy.status === 'Under Review' ? 'Under Review' : 'Draft Status'}
+                        {getPolicyStatusMessage(selectedPolicy.status)}
                       </span>
                     </div>
                     <div className="flex items-center space-x-2">

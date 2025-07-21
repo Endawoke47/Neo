@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Briefcase, Plus, Search, Download, Upload, Edit3, Trash2, Eye, CheckCircle, AlertTriangle, BarChart3, Calendar, Clock, DollarSign, Users, TrendingUp, Target, Loader2 } from 'lucide-react';
+import { Briefcase, Plus, Download, Upload, Edit3, Trash2, Eye, BarChart3, Calendar, Clock, DollarSign, TrendingUp, Loader2 } from 'lucide-react';
 import MainLayout from '../../components/layout/MainLayout';
 import { useMatters, useCreateMatter, useClients } from '../../hooks/useApi';
 import { useAuth } from '../../providers/auth-provider';
@@ -10,7 +10,6 @@ import { MatterService, Matter as APIMatter } from '../../services/api.service';
 import SearchAndFilter from '../../components/ui/SearchAndFilter';
 import LoadingSkeleton from '../../components/ui/LoadingSkeleton';
 import EmptyState from '../../components/ui/EmptyState';
-import ErrorState from '../../components/ui/ErrorState';
 
 // Extended Matter interface that includes UI-specific fields
 interface Matter extends Omit<APIMatter, 'client'> {
@@ -25,16 +24,71 @@ interface Matter extends Omit<APIMatter, 'client'> {
   startDate?: string; // UI field for matter start dates
 }
 
+// Helper functions for nested ternary operations
+const getMatterBaseBudget = (matterType: string) => {
+  if (matterType === 'litigation') return 150000;
+  if (matterType === 'corporate') return 80000;
+  return 50000;
+};
+
+const getMatterBudgetUsage = (matterType: string, status: string) => {
+  let baseUsage = 0.3;
+  if (matterType === 'litigation') baseUsage = 0.7;
+  else if (matterType === 'corporate') baseUsage = 0.5;
+  
+  if (status === 'ACTIVE') return baseUsage + 0.4;
+  return baseUsage + 0.1;
+};
+
+const getMatterTimeSpent = (matterType: string, status: string) => {
+  let baseTime = 40;
+  if (matterType === 'litigation') baseTime = 120;
+  else if (matterType === 'corporate') baseTime = 60;
+  
+  if (status === 'ACTIVE') return baseTime + 80;
+  return baseTime + 20;
+};
+
+const getMatterEstimatedHours = (matterType: string, status: string) => {
+  let baseHours = 75;
+  if (matterType === 'litigation') baseHours = 200;
+  else if (matterType === 'corporate') baseHours = 100;
+  
+  if (status === 'ACTIVE') return baseHours + 60;
+  return baseHours + 15;
+};
+
+const getMatterDeadlineOffset = (matterType: string) => {
+  if (matterType === 'litigation') return 365;
+  if (matterType === 'corporate') return 180;
+  return 90;
+};
+
+const getMatterProgressBarColor = (progress: number) => {
+  if (progress >= 80) return 'bg-green-500';
+  if (progress >= 50) return 'bg-primary-500';
+  return 'bg-yellow-500';
+};
+
+const getMatterProgress = (status: string) => {
+  if (status === 'COMPLETED') return 100;
+  if (status === 'ACTIVE') return 60;
+  return 15;
+};
+
+const getEmptyStateDescription = (searchTerm: string, selectedFilter: string) => {
+  if (searchTerm || selectedFilter !== 'all') {
+    return 'No matters match your current filters.';
+  }
+  return 'Get started by creating your first matter.';
+};
+
 export default function MatterManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [isAddingMatter, setIsAddingMatter] = useState(false);
   const [editingMatter, setEditingMatter] = useState<Matter | null>(null);
   const [selectedMatter, setSelectedMatter] = useState<Matter | null>(null);
-  const [selectedClientId, setSelectedClientId] = useState<string>('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState('');
-  const [sortOrder, setSortOrder] = useState('desc');
 
   // API hooks
   const {
@@ -45,14 +99,14 @@ export default function MatterManagementPage() {
     updateParams,
     refetch: refetchMatters
   } = useMatters({ 
-    page: currentPage, 
+    page: 1, 
     search: searchTerm,
     status: selectedFilter === 'all' ? undefined : selectedFilter,
-    sortBy,
-    sortOrder
+    sortBy: 'createdAt',
+    sortOrder: 'desc'
   });
   
-  const { createMatter, loading: createLoading, error: createError } = useCreateMatter();
+  const { createMatter, loading: createLoading } = useCreateMatter();
 
   // Get current user and clients for form state management
   const { user } = useAuth();
@@ -60,22 +114,19 @@ export default function MatterManagementPage() {
 
   // Transform API matters to include UI-specific fields with realistic data
   const matters: Matter[] = apiMatters.map((matter) => {
-    const baseBudget = matter.type === 'litigation' ? 150000 : matter.type === 'corporate' ? 80000 : 50000;
+    const baseBudget = getMatterBaseBudget(matter.type);
     const budget = baseBudget + (matter.id?.length || 0) * 1000;
     
-    const billedPercentage = matter.status === 'COMPLETED' ? 0.9 : 
-                           matter.status === 'ACTIVE' ? 0.4 : 0.1;
+    const billedPercentage = getMatterBudgetUsage(matter.type, matter.status);
     const billed = Math.floor(budget * billedPercentage);
     
-    const timeSpent = matter.status === 'COMPLETED' ? 150 : 
-                     matter.status === 'ACTIVE' ? 80 : 20;
-    const estimatedHours = timeSpent + 50;
-    const progress = matter.status === 'COMPLETED' ? 100 : 
-                    matter.status === 'ACTIVE' ? 60 : 15;
+    const timeSpent = getMatterTimeSpent(matter.type, matter.status);
+    const estimatedHours = getMatterEstimatedHours(matter.type, matter.status);
+    const progress = getMatterProgress(matter.status);
     
     // Generate realistic deadlines based on matter type and status
     const createdDate = new Date(matter.createdAt);
-    const deadlineOffset = matter.type === 'litigation' ? 365 : matter.type === 'corporate' ? 180 : 90; // days
+    const deadlineOffset = getMatterDeadlineOffset(matter.type);
     const deadline = new Date(createdDate);
     deadline.setDate(deadline.getDate() + deadlineOffset);
     
@@ -200,7 +251,7 @@ export default function MatterManagementPage() {
         }
       } else {
         // Validate required fields
-        const clientId = selectedClientId || matterData.clientId;
+        const clientId = matterData.clientId;
         const assignedLawyerId = user?.id || matterData.assignedLawyerId;
         
         if (!clientId) {
@@ -370,7 +421,7 @@ export default function MatterManagementPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {stats.map((stat, index) => (
-              <div key={index} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+              <div key={`matter-stat-${stat.label.replace(/\s+/g, '-').toLowerCase()}`} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                 <div className="flex items-center">
                   <div className={`p-3 rounded-lg ${stat.color} bg-opacity-10`}>
                     <stat.icon className={`w-6 h-6 ${stat.color}`} />
@@ -487,7 +538,7 @@ export default function MatterManagementPage() {
                         <div className="flex items-center">
                           <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                             <div 
-                              className={`h-2 rounded-full ${(matter.progress || 0) >= 80 ? 'bg-green-500' : (matter.progress || 0) >= 50 ? 'bg-primary-500' : 'bg-yellow-500'}`}
+                              className={`h-2 rounded-full ${getMatterProgressBarColor(matter.progress || 0)}`}
                               style={{ width: `${matter.progress || 0}%` }}
                             ></div>
                           </div>
@@ -497,7 +548,7 @@ export default function MatterManagementPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex -space-x-1">
                           {(matter.assignedTeam || []).slice(0, 3).map((member, index) => (
-                            <div key={index} className="w-6 h-6 rounded-full bg-gray-300 border-2 border-white flex items-center justify-center text-xs font-medium text-gray-600">
+                            <div key={`${matter.id}-team-${member.replace(/\s+/g, '-').toLowerCase()}`} className="w-6 h-6 rounded-full bg-gray-300 border-2 border-white flex items-center justify-center text-xs font-medium text-gray-600">
                               {member.split(' ').map(n => n[0]).join('')}
                             </div>
                           ))}
@@ -582,7 +633,7 @@ export default function MatterManagementPage() {
             </div>
             <div className="space-y-4">
               {upcomingDeadlines.length > 0 ? upcomingDeadlines.map((deadline, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+                <div key={`deadline-${deadline.matter.replace(/\s+/g, '-').toLowerCase()}-${deadline.client.replace(/\s+/g, '-').toLowerCase()}`} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                   <div>
                     <p className="font-medium text-gray-900">{deadline.matter}</p>
                     <p className="text-sm text-gray-600">{deadline.client}</p>
@@ -647,6 +698,7 @@ export default function MatterManagementPage() {
               const matterData = {
                 title: formData.get('title') as string,
                 description: formData.get('description') as string,
+                clientId: formData.get('clientId') as string,
                 type: formData.get('type') as string,
                 status: formData.get('status') as string,
                 priority: formData.get('priority') as string,
@@ -657,28 +709,48 @@ export default function MatterManagementPage() {
             }}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Matter Title</label>
+                  <label htmlFor="matter-title" className="block text-sm font-medium text-gray-700 mb-1">Matter Title</label>
                   <input
                     type="text"
                     name="title"
+                    id="matter-title"
                     required
                     defaultValue={editingMatter?.title}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <label htmlFor="matter-description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                   <textarea
                     name="description"
+                    id="matter-description"
                     rows={3}
                     defaultValue={editingMatter?.description}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
+                <div className="md:col-span-2">
+                  <label htmlFor="matter-client" className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+                  <select
+                    name="clientId"
+                    id="matter-client"
+                    required
+                    defaultValue={editingMatter?.clientId || ''}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Select Client</option>
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Matter Type</label>
+                  <label htmlFor="matter-type" className="block text-sm font-medium text-gray-700 mb-1">Matter Type</label>
                   <select
                     name="type"
+                    id="matter-type"
                     required
                     defaultValue={editingMatter?.type}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
@@ -694,9 +766,10 @@ export default function MatterManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <label htmlFor="matter-status" className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                   <select
                     name="status"
+                    id="matter-status"
                     required
                     defaultValue={editingMatter?.status}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
@@ -710,9 +783,10 @@ export default function MatterManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                  <label htmlFor="matter-priority" className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
                   <select
                     name="priority"
+                    id="matter-priority"
                     required
                     defaultValue={editingMatter?.priority}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
@@ -723,20 +797,22 @@ export default function MatterManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                  <label htmlFor="matter-start-date" className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                   <input
                     type="date"
                     name="startDate"
+                    id="matter-start-date"
                     required
                     defaultValue={editingMatter?.startDate}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Deadline</label>
+                  <label htmlFor="matter-deadline" className="block text-sm font-medium text-gray-700 mb-1">Deadline</label>
                   <input
                     type="date"
                     name="deadline"
+                    id="matter-deadline"
                     defaultValue={editingMatter?.deadline}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
@@ -882,7 +958,7 @@ export default function MatterManagementPage() {
                   <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Team</h3>
                   <div className="mt-2 space-y-2">
                     {(selectedMatter.assignedTeam || []).map((member, index) => (
-                      <div key={index} className="flex items-center space-x-2">
+                      <div key={`modal-team-${member.replace(/\s+/g, '-').toLowerCase()}`} className="flex items-center space-x-2">
                         <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-sm font-medium text-primary-600">
                           {member.split(' ').map(n => n[0]).join('')}
                         </div>

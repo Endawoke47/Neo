@@ -1,7 +1,7 @@
 // Task Form Modal with Comprehensive Validation
 // Provides a complete form for creating and editing tasks with real-time validation
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import FormField, { FormSection, FormGrid, FormActions } from '../ui/FormField';
 import { validateForm, taskValidationSchema, validateFieldRealTime } from '../../utils/validation';
@@ -9,11 +9,11 @@ import { useUsers, useMatters, useContracts, useClients } from '../../hooks/useA
 import { Task } from '../../services/api.service';
 
 interface TaskFormModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (taskData: any) => Promise<{ success: boolean; error?: string }>;
-  task?: Task | null;
-  isLoading?: boolean;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
+  readonly onSave: (taskData: any) => Promise<{ success: boolean; error?: string }>;
+  readonly task?: Task | null;
+  readonly isLoading?: boolean;
 }
 
 interface TaskFormData {
@@ -181,7 +181,11 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
         {/* Background overlay */}
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={handleCancel}></div>
+        <button 
+          className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+          onClick={handleCancel}
+          aria-label="Close modal"
+        ></button>
 
         {/* Modal panel */}
         <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
@@ -204,9 +208,9 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
           {/* Content */}
           <div className="bg-white px-6 py-6 max-h-96 overflow-y-auto">
             {/* Display submit errors */}
-            {errors.submit && (
+            {errors['submit'] && (
               <div className="mb-6 bg-red-50 border border-red-200 rounded-md p-4">
-                <div className="text-sm text-red-600">{errors.submit}</div>
+                <div className="text-sm text-red-600">{errors['submit']}</div>
               </div>
             )}
 
@@ -221,7 +225,7 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
                   name="title"
                   value={formData.title}
                   onChange={(value) => handleFieldChange('title', value)}
-                  error={errors.title}
+                  error={errors['title']}
                   required
                   placeholder="Enter task title"
                 />
@@ -232,7 +236,7 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
                   type="textarea"
                   value={formData.description}
                   onChange={(value) => handleFieldChange('description', value)}
-                  error={errors.description}
+                  error={errors['description']}
                   placeholder="Describe what needs to be done..."
                   rows={3}
                 />
@@ -245,7 +249,7 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
                     value={formData.priority}
                     onChange={(value) => handleFieldChange('priority', value)}
                     options={priorities}
-                    error={errors.priority}
+                    error={errors['priority']}
                     required
                   />
                   
@@ -256,7 +260,7 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
                     value={formData.status}
                     onChange={(value) => handleFieldChange('status', value)}
                     options={statuses}
-                    error={errors.status}
+                    error={errors['status']}
                     required
                   />
                   
@@ -267,7 +271,7 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
                     value={formData.category}
                     onChange={(value) => handleFieldChange('category', value)}
                     options={categories}
-                    error={errors.category}
+                    error={errors['category']}
                   />
                 </FormGrid>
               </FormSection>
@@ -284,7 +288,7 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
                     type="date"
                     value={formData.dueDate}
                     onChange={(value) => handleFieldChange('dueDate', value)}
-                    error={errors.dueDate}
+                    error={errors['dueDate']}
                   />
                   
                   <FormField
@@ -293,7 +297,7 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
                     type="number"
                     value={formData.progress}
                     onChange={(value) => handleFieldChange('progress', value)}
-                    error={errors.progress}
+                    error={errors['progress']}
                     min={0}
                     max={100}
                     step={5}
@@ -305,7 +309,7 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
                     type="number"
                     value={formData.estimatedHours}
                     onChange={(value) => handleFieldChange('estimatedHours', value)}
-                    error={errors.estimatedHours}
+                    error={errors['estimatedHours']}
                     min={0}
                     step={0.5}
                   />
@@ -316,7 +320,7 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
                     type="number"
                     value={formData.actualHours}
                     onChange={(value) => handleFieldChange('actualHours', value)}
-                    error={errors.actualHours}
+                    error={errors['actualHours']}
                     min={0}
                     step={0.5}
                   />
@@ -335,11 +339,14 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
                     type="select"
                     value={formData.assignedToId}
                     onChange={(value) => handleFieldChange('assignedToId', value)}
-                    options={users.map(user => ({
-                      value: user.id,
-                      label: `${user.firstName} ${user.lastName} ${user.specialization ? `(${user.specialization})` : ''}`
-                    }))}
-                    error={errors.assignedToId}
+                    options={users.map(user => {
+                      const specialization = user.specialization ? `(${user.specialization})` : '';
+                      return {
+                        value: user.id,
+                        label: `${user.firstName} ${user.lastName} ${specialization}`
+                      };
+                    })}
+                    error={errors['assignedToId']}
                     required
                   />
                   
@@ -353,7 +360,7 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
                       value: client.id,
                       label: client.name
                     }))}
-                    error={errors.clientId}
+                    error={errors['clientId']}
                   />
                   
                   <FormField
@@ -366,7 +373,7 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
                       value: matter.id,
                       label: matter.title
                     }))}
-                    error={errors.matterId}
+                    error={errors['matterId']}
                   />
                   
                   <FormField
@@ -379,7 +386,7 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
                       value: contract.id,
                       label: contract.title
                     }))}
-                    error={errors.contractId}
+                    error={errors['contractId']}
                   />
                 </FormGrid>
               </FormSection>
@@ -395,7 +402,12 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
                       type="text"
                       value={tagInput}
                       onChange={(e) => setTagInput(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddTag();
+                        }
+                      }}
                       placeholder="Add a tag and press Enter"
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                     />
@@ -410,9 +422,9 @@ export default function TaskFormModal({ isOpen, onClose, onSave, task, isLoading
                   
                   {formData.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2">
-                      {formData.tags.map((tag, index) => (
+                      {formData.tags.map((tag) => (
                         <span
-                          key={index}
+                          key={tag}
                           className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800"
                         >
                           {tag}

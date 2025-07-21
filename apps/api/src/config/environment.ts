@@ -9,7 +9,7 @@ import { z } from 'zod';
 const environmentSchema = z.object({
   // Core application
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  PORT: z.string().transform(Number).default('8000'),
+  PORT: z.string().transform(Number).default('8080'),
   
   // Database (required)
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
@@ -72,7 +72,7 @@ const environmentSchema = z.object({
   SECRETS_ENCRYPTION_KEY: z.string().min(32).optional(),
   
   // Security Headers
-  ALLOWED_ORIGINS: z.string().default('http://localhost:3000'),
+  ALLOWED_ORIGINS: z.string().default('http://localhost:3000,http://localhost:3003'),
   COOKIE_SECRET: z.string().min(32).optional(),
   
   // Rate Limiting

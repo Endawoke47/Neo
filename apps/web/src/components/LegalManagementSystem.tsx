@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  Search, FileText, Upload, Download, Filter, Edit, Eye, Trash2, 
-  Plus, Calendar, DollarSign, AlertTriangle, CheckCircle, Clock,
-  Building, Scale, Users, Shield, BookOpen, Settings, BarChart3,
-  FileCheck, MessageCircle, Globe
+  Search, FileText, Upload, Download, Edit, Eye, Trash2, 
+  DollarSign, AlertTriangle, CheckCircle, Clock,
+  Building, Scale, Shield, BookOpen, Settings,
+  FileCheck, Globe
 } from 'lucide-react';
 
 // Types
@@ -375,7 +375,44 @@ const LegalManagementSystem = () => {
   const [activeKnowledgeTab, setActiveKnowledgeTab] = useState('templates');
   const [filteredData, setFilteredData] = useState<LegalCase[]>([]);
   const [showUploadModal, setShowUploadModal] = useState(false);
-  const [cases, setCases] = useState<LegalCase[]>(africanLegalCases);
+  const [cases] = useState<LegalCase[]>(africanLegalCases);
+
+  // Helper functions for status and risk level styling
+  const getStatusBadgeClasses = (status: string) => {
+    if (status === 'Active') {
+      return 'bg-green-100 text-green-800';
+    }
+    if (status === 'In Progress') {
+      return 'bg-primary-100 text-primary-800';
+    }
+    if (status === 'Under Review') {
+      return 'bg-yellow-100 text-yellow-800';
+    }
+    return 'bg-gray-100 text-gray-800';
+  };
+
+  const getRiskLevelBadgeClasses = (riskLevel: string) => {
+    if (riskLevel === 'Critical') {
+      return 'bg-red-100 text-red-800';
+    }
+    if (riskLevel === 'High') {
+      return 'bg-orange-100 text-orange-800';
+    }
+    if (riskLevel === 'Medium') {
+      return 'bg-yellow-100 text-yellow-800';
+    }
+    return 'bg-green-100 text-green-800';
+  };
+
+  const getPriorityBadgeClasses = (priority: string) => {
+    if (priority === 'Critical') {
+      return 'bg-red-100 text-red-800';
+    }
+    if (priority === 'High') {
+      return 'bg-orange-100 text-orange-800';
+    }
+    return 'bg-yellow-100 text-yellow-800';
+  };
 
   const modules = [
     { name: 'Entity Management', icon: Building, color: 'bg-primary-500' },
@@ -492,8 +529,8 @@ const LegalManagementSystem = () => {
                       <h3 className="font-semibold text-gray-900 mb-2">{template.name}</h3>
                       <p className="text-sm text-gray-600 mb-3">{template.category} • {template.jurisdiction}</p>
                       <div className="flex flex-wrap gap-1 mb-3">
-                        {template.tags.map((tag, index) => (
-                          <span key={index} className="px-2 py-1 bg-teal-100 text-teal-800 text-xs rounded">
+                        {template.tags.map((tag) => (
+                          <span key={`${template.id}-${tag}`} className="px-2 py-1 bg-teal-100 text-teal-800 text-xs rounded">
                             {tag}
                           </span>
                         ))}
@@ -531,8 +568,8 @@ const LegalManagementSystem = () => {
                         <div><span className="font-medium">Outcome:</span> {caseFile.outcome}</div>
                       </div>
                       <div className="flex flex-wrap gap-1">
-                        {caseFile.tags.map((tag, index) => (
-                          <span key={index} className="px-2 py-1 bg-primary-100 text-primary-800 text-xs rounded">
+                        {caseFile.tags.map((tag) => (
+                          <span key={`${caseFile.id}-${tag}`} className="px-2 py-1 bg-primary-100 text-primary-800 text-xs rounded">
                             {tag}
                           </span>
                         ))}
@@ -566,8 +603,8 @@ const LegalManagementSystem = () => {
                     <div><span className="font-medium">ISBN:</span> {book.isbn}</div>
                   </div>
                   <div className="flex flex-wrap gap-1 mb-4">
-                    {book.tags.map((tag, index) => (
-                      <span key={index} className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
+                    {book.tags.map((tag) => (
+                      <span key={`${book.id}-${tag}`} className="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded">
                         {tag}
                       </span>
                     ))}
@@ -634,12 +671,7 @@ const LegalManagementSystem = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        case_.status === 'Active' ? 'bg-green-100 text-green-800' :
-                        case_.status === 'In Progress' ? 'bg-primary-100 text-primary-800' :
-                        case_.status === 'Under Review' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeClasses(case_.status)}`}>
                         {case_.status}
                       </span>
                     </td>
@@ -647,12 +679,7 @@ const LegalManagementSystem = () => {
                       ${case_.value?.toLocaleString() || 'N/A'}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        case_.riskLevel === 'Critical' ? 'bg-red-100 text-red-800' :
-                        case_.riskLevel === 'High' ? 'bg-orange-100 text-orange-800' :
-                        case_.riskLevel === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRiskLevelBadgeClasses(case_.riskLevel || 'Low')}`}>
                         {case_.riskLevel || 'Low'}
                       </span>
                     </td>
@@ -703,11 +730,7 @@ const LegalManagementSystem = () => {
                     <div><span className="font-medium">Jurisdiction:</span> {selectedCase.jurisdiction}</div>
                     <div><span className="font-medium">Entity Type:</span> {selectedCase.entityType}</div>
                     <div><span className="font-medium">Priority:</span> 
-                      <span className={`ml-2 px-2 py-1 rounded text-xs ${
-                        selectedCase.priority === 'Critical' ? 'bg-red-100 text-red-800' :
-                        selectedCase.priority === 'High' ? 'bg-orange-100 text-orange-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
+                      <span className={`ml-2 px-2 py-1 rounded text-xs ${getPriorityBadgeClasses(selectedCase.priority)}`}>
                         {selectedCase.priority}
                       </span>
                     </div>
@@ -776,14 +799,14 @@ const LegalManagementSystem = () => {
               <h4 className="font-medium text-gray-900 mb-4">Related Cases</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {getRelatedCases(selectedCase.id).map((relatedCase) => (
-                  <div key={relatedCase.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow cursor-pointer"
+                  <button key={relatedCase.id} className="p-4 border rounded-lg hover:shadow-md transition-shadow cursor-pointer text-left w-full"
                        onClick={() => setSelectedCase(relatedCase)}>
                     <h5 className="font-medium text-sm text-gray-900 mb-2">{relatedCase.caseTitle}</h5>
                     <div className="text-xs text-gray-600 space-y-1">
                       <div>{relatedCase.country} • {relatedCase.module}</div>
                       <div>${relatedCase.value?.toLocaleString() || 'N/A'}</div>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -935,10 +958,10 @@ const LegalManagementSystem = () => {
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="file-type-select" className="block text-sm font-medium text-gray-700 mb-2">
                   Select File Type
                 </label>
-                <select className="w-full border border-gray-300 rounded-lg px-3 py-2">
+                <select id="file-type-select" className="w-full border border-gray-300 rounded-lg px-3 py-2">
                   <option>CSV File</option>
                   <option>PDF Document</option>
                   <option>Word Document</option>
@@ -946,10 +969,11 @@ const LegalManagementSystem = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="file-input" className="block text-sm font-medium text-gray-700 mb-2">
                   Choose File
                 </label>
                 <input
+                  id="file-input"
                   type="file"
                   onChange={handleFileUpload}
                   accept=".csv,.pdf,.doc,.docx,.xlsx"

@@ -28,6 +28,7 @@ export default function SearchInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
+        aria-label="Search"
       />
     </div>
   );

@@ -1,14 +1,14 @@
-// Client Portal Service Implementation
-class ClientPortalService {
-  private baseUrl: string;
-  private authToken: string;
+// Base class for API services with shared request functionality
+abstract class BaseApiService {
+  protected readonly baseUrl: string;
+  protected readonly authToken: string;
 
   constructor() {
-    this.baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+    this.baseUrl = process.env['REACT_APP_API_URL'] || 'http://localhost:3001/api';
     this.authToken = localStorage.getItem('authToken') || '';
   }
 
-  private async makeRequest(endpoint: string, options: RequestInit = {}) {
+  protected async makeRequest(endpoint: string, options: RequestInit = {}) {
     const url = `${this.baseUrl}${endpoint}`;
     const config: RequestInit = {
       ...options,
@@ -27,6 +27,10 @@ class ClientPortalService {
 
     return response.json();
   }
+}
+
+// Client Portal Service Implementation
+class ClientPortalService extends BaseApiService {
 
   async getClientDashboard(clientId: string) {
     return this.makeRequest(`/client-portal/dashboard/${clientId}`);
@@ -113,35 +117,7 @@ class ClientPortalService {
 }
 
 // Security Service Implementation
-class SecurityService {
-  private baseUrl: string;
-  private authToken: string;
-
-  constructor() {
-    this.baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
-    this.authToken = localStorage.getItem('authToken') || '';
-  }
-
-  private async makeRequest(endpoint: string, options: RequestInit = {}) {
-    const url = `${this.baseUrl}${endpoint}`;
-    const config: RequestInit = {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.authToken}`,
-        ...options.headers,
-      },
-    };
-
-    const response = await fetch(url, config);
-    
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status} ${response.statusText}`);
-    }
-
-    return response.json();
-  }
-
+class SecurityService extends BaseApiService {
   async getSecuritySettings(clientId: string) {
     return this.makeRequest(`/security/settings/${clientId}`);
   }

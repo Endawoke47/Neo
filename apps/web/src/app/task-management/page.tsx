@@ -2,16 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import MainLayout from '../../components/layout/MainLayout';
-import { CheckSquare, Plus, Search, Download, Upload, Edit3, Trash2, Eye, Clock, Calendar, User, AlertTriangle, TrendingUp, BarChart3, Target, Activity, Loader2 } from 'lucide-react';
-import { useTasks, useCreateTask, useUpdateTaskProgress, useUsers } from '../../hooks/useApi';
+import { CheckSquare, Plus, Search, Download, Upload, Edit3, Trash2, Eye, Clock, Calendar, User, AlertTriangle, BarChart3, Target, Activity, Loader2 } from 'lucide-react';
+import { useTasks, useCreateTask, useUsers } from '../../hooks/useApi';
 import { useAuth } from '../../providers/auth-provider';
-import { useDebouncedSearch } from '../../hooks/useDebounced';
 import { TaskService, Task as APITask } from '../../services/api.service';
 import TaskFormModal from '../../components/modals/TaskFormModal';
-import SearchAndFilter from '../../components/ui/SearchAndFilter';
-import LoadingSkeleton from '../../components/ui/LoadingSkeleton';
-import EmptyState from '../../components/ui/EmptyState';
-import ErrorState from '../../components/ui/ErrorState';
 
 // Extended Task interface that includes UI-specific fields
 interface Task extends APITask {
@@ -22,12 +17,33 @@ interface Task extends APITask {
 }
 
 export default function TaskManagementPage() {
+  // Helper functions to replace nested ternary operations
+  const getProgressBarColor = (progress: number): string => {
+    if (progress >= 90) return 'bg-green-500';
+    if (progress >= 50) return 'bg-primary-500';
+    if (progress >= 25) return 'bg-yellow-500';
+    return 'bg-red-500';
+  };
+
+  const getStatusDotColor = (status: string): string => {
+    if (status === 'Completed') return 'bg-green-500';
+    if (status === 'In Progress') return 'bg-primary-500';
+    return 'bg-gray-500';
+  };
+
+  const getButtonText = (editingTask: Task | null): string => {
+    return editingTask ? 'Update Task' : 'Add Task';
+  };
+
+  const getStatusMessage = (status: string): string => {
+    if (status === 'Completed') return 'Task completed';
+    if (status === 'In Progress') return 'Work in progress';
+    return 'Awaiting start';
+  };
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
-  const [selectedAssigneeId, setSelectedAssigneeId] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState('');
-  const [sortOrder, setSortOrder] = useState('desc');
 
   // API hooks
   const {
@@ -40,13 +56,10 @@ export default function TaskManagementPage() {
   } = useTasks({ 
     page: currentPage, 
     search: searchTerm,
-    status: selectedFilter === 'all' ? undefined : selectedFilter,
-    sortBy,
-    sortOrder
+    status: selectedFilter === 'all' ? undefined : selectedFilter
   });
   
-  const { createTask, loading: createLoading, error: createError } = useCreateTask();
-  const { updateProgress, loading: progressLoading } = useUpdateTaskProgress();
+  const { createTask, loading: createLoading } = useCreateTask();
 
   // Get current user and users for form state management
   const { user } = useAuth();
@@ -174,7 +187,7 @@ export default function TaskManagementPage() {
         }
       } else {
         // Validate required fields
-        const assignedToId = selectedAssigneeId || taskData.assignedToId || user?.id;
+        const assignedToId = taskData.assignedToId || user?.id;
         
         if (!assignedToId) {
           alert('Please select an assignee for this task.');
@@ -214,14 +227,14 @@ export default function TaskManagementPage() {
     { 
       label: 'Total Tasks', 
       value: pagination?.total?.toString() || '0', 
-      change: '+' + Math.floor(Math.random() * 10), // TODO: Calculate from historical data
+      change: '', // Historical data calculation would go here
       icon: CheckSquare, 
       color: 'text-primary-600' 
     },
     { 
       label: 'In Progress', 
       value: tasks.filter(t => t.status === 'In Progress' || t.status === 'Active').length.toString(), 
-      change: '+' + Math.floor(Math.random() * 5), // TODO: Calculate from historical data
+      change: '', // Historical data calculation would go here
       icon: Clock, 
       color: 'text-orange-600' 
     },
@@ -233,14 +246,14 @@ export default function TaskManagementPage() {
         const today = new Date();
         return dueDate < today && t.status !== 'Completed' && t.status !== 'Done';
       }).length.toString(), 
-      change: '-' + Math.floor(Math.random() * 3), // TODO: Calculate from historical data
+      change: '', // Historical data calculation would go here
       icon: AlertTriangle, 
       color: 'text-red-600' 
     },
     { 
       label: 'Completed', 
       value: tasks.filter(t => t.status === 'Completed' || t.status === 'Done').length.toString(), 
-      change: '+' + Math.floor(Math.random() * 12), // TODO: Calculate from historical data
+      change: '', // Historical data calculation would go here
       icon: Target, 
       color: 'text-green-600' 
     }
@@ -267,7 +280,7 @@ export default function TaskManagementPage() {
   const upcomingDeadlines = tasks
     .filter(task => task.dueDate && task.status !== 'Completed' && task.status !== 'Done')
     .map(task => {
-      const dueDate = new Date(task.dueDate!);
+      const dueDate = new Date(task.dueDate);
       const today = new Date();
       const timeDiff = dueDate.getTime() - today.getTime();
       const daysLeft = Math.ceil(timeDiff / (1000 * 3600 * 24));
@@ -275,7 +288,7 @@ export default function TaskManagementPage() {
       return {
         task: task.title,
         assignee: task.assignee || 'Unassigned',
-        dueDate: task.dueDate!,
+        dueDate: task.dueDate,
         daysLeft,
         priority: task.priority
       };
@@ -319,20 +332,6 @@ export default function TaskManagementPage() {
     if (selectedFilter === 'all') return matchesSearch;
     return matchesSearch && task.status.toLowerCase().replace(' ', '') === selectedFilter;
   });
-
-  // Handler for updating task progress
-  const handleProgressUpdate = async (taskId: string, newProgress: number) => {
-    try {
-      const response = await updateProgress(taskId, newProgress);
-      if (response.success) {
-        refetchTasks();
-      } else {
-        alert('Failed to update progress: ' + response.error);
-      }
-    } catch (error: any) {
-      alert('Failed to update progress: ' + (error?.response?.data?.error || error.message));
-    }
-  };
 
   return (
     <MainLayout>
@@ -401,7 +400,7 @@ export default function TaskManagementPage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat, index) => (
-            <div key={index} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+            <div key={`task-stat-${stat.label}-${index}`} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
               <div className="flex items-center">
                 <div className={`p-3 rounded-lg ${stat.color} bg-opacity-10`}>
                   <stat.icon className={`w-6 h-6 ${stat.color}`} />
@@ -424,9 +423,11 @@ export default function TaskManagementPage() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
+              <label htmlFor="task-search" className="sr-only">Search tasks</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
+                  id="task-search"
                   type="text"
                   placeholder="Search tasks, assignees, or projects..."
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -436,7 +437,9 @@ export default function TaskManagementPage() {
               </div>
             </div>
             <div className="sm:w-48">
+              <label htmlFor="status-filter" className="sr-only">Filter by status</label>
               <select
+                id="status-filter"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 value={selectedFilter}
                 onChange={(e) => setSelectedFilter(e.target.value)}
@@ -508,7 +511,7 @@ export default function TaskManagementPage() {
                       <div className="flex items-center">
                         <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                           <div 
-                            className={`h-2 rounded-full ${task.progress >= 90 ? 'bg-green-500' : task.progress >= 50 ? 'bg-primary-500' : task.progress >= 25 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                            className={`h-2 rounded-full ${getProgressBarColor(task.progress)}`}
                             style={{ width: `${task.progress}%` }}
                           ></div>
                         </div>
@@ -601,8 +604,8 @@ export default function TaskManagementPage() {
               <button className="text-sm text-primary-600 hover:text-primary-800">View Details</button>
             </div>
             <div className="space-y-4">
-              {taskCategories.map((category, index) => (
-                <div key={index} className="space-y-2">
+              {taskCategories.map((category) => (
+                <div key={category.category} className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-gray-900">{category.category}</span>
                     <span className="text-sm text-gray-600">{category.count} tasks ({category.percentage}%)</span>
@@ -635,8 +638,8 @@ export default function TaskManagementPage() {
               <button className="text-sm text-primary-600 hover:text-primary-800">View All</button>
             </div>
             <div className="space-y-4">
-              {upcomingDeadlines.map((deadline, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+              {upcomingDeadlines.map((deadline) => (
+                <div key={deadline.task} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                   <div>
                     <p className="font-medium text-gray-900">{deadline.task}</p>
                     <p className="text-sm text-gray-600">{deadline.assignee}</p>
@@ -691,8 +694,9 @@ export default function TaskManagementPage() {
             }}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Task Title</label>
+                  <label htmlFor="task-title" className="block text-sm font-medium text-gray-700 mb-1">Task Title</label>
                   <input
+                    id="task-title"
                     type="text"
                     name="title"
                     required
@@ -701,8 +705,9 @@ export default function TaskManagementPage() {
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <label htmlFor="task-description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                   <textarea
+                    id="task-description"
                     name="description"
                     rows={3}
                     defaultValue={editingTask?.description}
@@ -710,8 +715,9 @@ export default function TaskManagementPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                  <label htmlFor="task-priority" className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
                   <select
+                    id="task-priority"
                     name="priority"
                     required
                     defaultValue={editingTask?.priority}
@@ -723,8 +729,9 @@ export default function TaskManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <label htmlFor="task-status" className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                   <select
+                    id="task-status"
                     name="status"
                     required
                     defaultValue={editingTask?.status}
@@ -738,8 +745,9 @@ export default function TaskManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Assignee</label>
+                  <label htmlFor="task-assignee" className="block text-sm font-medium text-gray-700 mb-1">Assignee</label>
                   <input
+                    id="task-assignee"
                     type="text"
                     name="assignee"
                     required
@@ -748,8 +756,9 @@ export default function TaskManagementPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
+                  <label htmlFor="task-project" className="block text-sm font-medium text-gray-700 mb-1">Project</label>
                   <input
+                    id="task-project"
                     type="text"
                     name="project"
                     required
@@ -758,8 +767,9 @@ export default function TaskManagementPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                  <label htmlFor="task-due-date" className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
                   <input
+                    id="task-due-date"
                     type="date"
                     name="dueDate"
                     defaultValue={editingTask?.dueDate}
@@ -767,8 +777,9 @@ export default function TaskManagementPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Completion Date</label>
+                  <label htmlFor="task-completion-date" className="block text-sm font-medium text-gray-700 mb-1">Completion Date</label>
                   <input
+                    id="task-completion-date"
                     type="date"
                     name="completedDate"
                     defaultValue={editingTask?.completedDate}
@@ -776,8 +787,9 @@ export default function TaskManagementPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Hours</label>
+                  <label htmlFor="task-estimated-hours" className="block text-sm font-medium text-gray-700 mb-1">Estimated Hours</label>
                   <input
+                    id="task-estimated-hours"
                     type="number"
                     name="estimatedHours"
                     min="0"
@@ -786,8 +798,9 @@ export default function TaskManagementPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Actual Hours</label>
+                  <label htmlFor="task-actual-hours" className="block text-sm font-medium text-gray-700 mb-1">Actual Hours</label>
                   <input
+                    id="task-actual-hours"
                     type="number"
                     name="actualHours"
                     min="0"
@@ -796,8 +809,9 @@ export default function TaskManagementPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <label htmlFor="task-category" className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                   <input
+                    id="task-category"
                     type="text"
                     name="category"
                     defaultValue={editingTask?.category}
@@ -805,8 +819,9 @@ export default function TaskManagementPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Progress (%)</label>
+                  <label htmlFor="task-progress" className="block text-sm font-medium text-gray-700 mb-1">Progress (%)</label>
                   <input
+                    id="task-progress"
                     type="number"
                     name="progress"
                     min="0"
@@ -816,8 +831,9 @@ export default function TaskManagementPage() {
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tags (comma-separated)</label>
+                  <label htmlFor="task-tags" className="block text-sm font-medium text-gray-700 mb-1">Tags (comma-separated)</label>
                   <input
+                    id="task-tags"
                     type="text"
                     name="tags"
                     defaultValue={editingTask?.tags?.join(', ')}
@@ -848,7 +864,7 @@ export default function TaskManagementPage() {
                       {editingTask ? 'Updating...' : 'Creating...'}
                     </>
                   ) : (
-                    editingTask ? 'Update Task' : 'Add Task'
+                    getButtonText(editingTask)
                   )}
                 </button>
               </div>
@@ -972,8 +988,8 @@ export default function TaskManagementPage() {
                 <div>
                   <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Tags</h3>
                   <div className="mt-2 flex flex-wrap gap-1">
-                    {(selectedTask.tags || []).map((tag, index) => (
-                      <span key={index} className="inline-flex px-2 py-1 text-xs font-medium bg-primary-100 text-primary-800 rounded-full">
+                    {(selectedTask.tags || []).map((tag) => (
+                      <span key={tag} className="inline-flex px-2 py-1 text-xs font-medium bg-primary-100 text-primary-800 rounded-full">
                         {tag}
                       </span>
                     ))}
@@ -984,9 +1000,9 @@ export default function TaskManagementPage() {
                   <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Activity</h3>
                   <div className="mt-2 space-y-2">
                     <div className="flex items-center space-x-2">
-                      <div className={`w-3 h-3 rounded-full ${selectedTask.status === 'Completed' ? 'bg-green-500' : selectedTask.status === 'In Progress' ? 'bg-primary-500' : 'bg-gray-500'}`}></div>
+                      <div className={`w-3 h-3 rounded-full ${getStatusDotColor(selectedTask.status)}`}></div>
                       <span className="text-sm text-gray-600">
-                        {selectedTask.status === 'Completed' ? 'Task completed' : selectedTask.status === 'In Progress' ? 'Work in progress' : 'Awaiting start'}
+                        {getStatusMessage(selectedTask.status)}
                       </span>
                     </div>
                     <div className="flex items-center space-x-2">

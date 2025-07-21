@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import MainLayout from '../../components/layout/MainLayout';
-import { FileText, Plus, Download, Upload, Edit3, Trash2, Eye, CheckCircle, BarChart3, Calendar, Brain, TrendingUp, Clock, DollarSign, Loader2 } from 'lucide-react';
+import { FileText, Plus, Download, Upload, Edit3, Trash2, Eye, CheckCircle, Brain, Clock, DollarSign, Loader2 } from 'lucide-react';
 import { useContracts, useCreateContract, useAnalyzeContract, useContractStats, useClients } from '../../hooks/useApi';
 import { useAuth } from '../../providers/auth-provider';
 import { useDebouncedSearch } from '../../hooks/useDebounced';
@@ -21,16 +21,44 @@ interface Contract extends APIContract {
   renewalDate?: string;
 }
 
+// Helper functions for nested ternary operations
+const getTotalContractValue = (contracts: Contract[] | undefined) => {
+  if (!contracts || contracts.length === 0) {
+    return '$0';
+  }
+  const totalValue = contracts.reduce((sum, c) => sum + (c.value || 0), 0) / 1000000;
+  return '$' + totalValue.toFixed(1) + 'M';
+};
+
+const getContractRiskBarColor = (riskScore: number) => {
+  if (riskScore >= 80) return 'bg-green-500';
+  if (riskScore >= 60) return 'bg-yellow-500';
+  return 'bg-red-500';
+};
+
+const getComplianceBarColor = (compliance: number) => {
+  if (compliance >= 90) return 'bg-green-500';
+  if (compliance >= 70) return 'bg-yellow-500';
+  return 'bg-red-500';
+};
+
+const getEmptyStateDescription = (searchTerm: string, selectedFilter: string) => {
+  if (searchTerm || selectedFilter !== 'all') {
+    return 'No contracts match your current filters.';
+  }
+  return 'Get started by creating your first contract.';
+};
+
 export default function ContractManagementPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [isAddingContract, setIsAddingContract] = useState(false);
   const [editingContract, setEditingContract] = useState<Contract | null>(null);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
-  const [selectedClientId, setSelectedClientId] = useState<string>('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortBy, setSortBy] = useState('');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const selectedClientId = '';
+  const currentPage = 1;
+  const sortBy = '';
+  const sortOrder = 'desc';
 
   // API hooks
   const {
@@ -48,11 +76,11 @@ export default function ContractManagementPage() {
     sortOrder
   });
   
-  const { createContract, loading: createLoading, error: createError } = useCreateContract();
-  const { analyzeContract, loading: analysisLoading, error: analysisError } = useAnalyzeContract();
+  const { createContract, loading: createLoading } = useCreateContract();
+  const { analyzeContract, loading: analysisLoading } = useAnalyzeContract();
 
   // Get contract statistics with historical comparison
-  const { data: contractStatsData, loading: statsLoading, error: statsError } = useContractStats();
+  const { data: contractStatsData, loading: statsLoading } = useContractStats();
 
   // Get current user and clients for form state management
   const { user } = useAuth();
@@ -167,7 +195,7 @@ export default function ContractManagementPage() {
         const result = await analyzeContract({
           contractId: contract.id,
           title: contract.title,
-          content: 'Contract content placeholder', // In real implementation, get actual contract content
+          content: `Contract: ${contract.title}\n\nType: ${contract.type}\nStatus: ${contract.status}\nClient: ${contract.client?.name || 'Unknown'}\nValue: ${contract.value ? '$' + contract.value.toLocaleString() : 'N/A'}\n\nThis contract requires comprehensive legal review and analysis for compliance with applicable laws and regulations.`,
           type: 'contract_review'
         });
         
@@ -259,9 +287,7 @@ export default function ContractManagementPage() {
       label: 'Total Value', 
       value: contractStatsData?.summary?.totalValue ? 
         '$' + (contractStatsData.summary.totalValue / 1000000).toFixed(1) + 'M' : 
-        (contracts?.length > 0 ? 
-          '$' + (contracts.reduce((sum, c) => sum + (c.value || 0), 0) / 1000000).toFixed(1) + 'M' : 
-          '$0'), 
+        getTotalContractValue(contracts), 
       change: contractStatsData?.changes?.totalValue || '0%',
       icon: DollarSign, 
       color: 'text-purple-600' 
@@ -291,7 +317,7 @@ export default function ContractManagementPage() {
   }).slice(0, 3).map(contract => ({
     contract: contract.title,
     counterparty: contract.counterparty || 'Unknown',
-    daysUntilExpiry: Math.ceil((new Date(contract.endDate!).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)),
+    daysUntilExpiry: contract.endDate ? Math.ceil((new Date(contract.endDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : 0,
     value: contract.value || 0
   }));
 
@@ -364,7 +390,7 @@ export default function ContractManagementPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {stats.map((stat, index) => (
-              <div key={index} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+              <div key={`contract-stat-${stat.label}-${index}`} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
                 <div className="flex items-center">
                   <div className={`p-3 rounded-lg ${stat.color} bg-opacity-10`}>
                     <stat.icon className={`w-6 h-6 ${stat.color}`} />
@@ -417,19 +443,19 @@ export default function ContractManagementPage() {
             </div>
           </div>
           <div className="overflow-x-auto">
-            {contractsLoading ? (
+            {contractsLoading && (
               <LoadingSkeleton type="table" className="p-6" />
-            ) : filteredContracts.length === 0 ? (
+            )}
+            {!contractsLoading && filteredContracts.length === 0 && (
               <EmptyState
                 icon={FileText}
                 title="No contracts found"
-                description={searchTerm || selectedFilter !== 'all' ? 
-                  'No contracts match your current filters.' : 
-                  'Get started by creating your first contract.'}
+                description={getEmptyStateDescription(searchTerm, selectedFilter)}
                 actionLabel="Add Contract"
                 onAction={handleAddContract}
               />
-            ) : (
+            )}
+            {!contractsLoading && filteredContracts.length > 0 && (
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
@@ -473,7 +499,7 @@ export default function ContractManagementPage() {
                         <div className="flex items-center">
                           <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                             <div 
-                              className={`h-2 rounded-full ${(contract.riskScore || 0) >= 80 ? 'bg-green-500' : (contract.riskScore || 0) >= 60 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                              className={`h-2 rounded-full ${getContractRiskBarColor(contract.riskScore || 0)}`}
                               style={{ width: `${contract.riskScore || 0}%` }}
                             ></div>
                           </div>
@@ -566,8 +592,8 @@ export default function ContractManagementPage() {
               <button className="text-sm text-primary-600 hover:text-primary-800">View All</button>
             </div>
             <div className="space-y-4">
-              {renewalAlerts.length > 0 ? renewalAlerts.map((alert, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+              {renewalAlerts.length > 0 ? renewalAlerts.map((alert) => (
+                <div key={alert.contract} className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
                   <div>
                     <p className="font-medium text-gray-900">{alert.contract}</p>
                     <p className="text-sm text-gray-600">{alert.counterparty}</p>
@@ -641,28 +667,31 @@ export default function ContractManagementPage() {
             }}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Contract Title</label>
+                  <label htmlFor="contract-title" className="block text-sm font-medium text-gray-700 mb-1">Contract Title</label>
                   <input
                     type="text"
                     name="title"
+                    id="contract-title"
                     required
                     defaultValue={editingContract?.title}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <label htmlFor="contract-description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                   <textarea
                     name="description"
+                    id="contract-description"
                     rows={3}
                     defaultValue={editingContract?.description}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Contract Type</label>
+                  <label htmlFor="contract-type" className="block text-sm font-medium text-gray-700 mb-1">Contract Type</label>
                   <select
                     name="type"
+                    id="contract-type"
                     required
                     defaultValue={editingContract?.type}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
@@ -678,9 +707,10 @@ export default function ContractManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <label htmlFor="contract-status" className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                   <select
                     name="status"
+                    id="contract-status"
                     required
                     defaultValue={editingContract?.status}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
@@ -693,30 +723,33 @@ export default function ContractManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Contract Value ($)</label>
+                  <label htmlFor="contract-value" className="block text-sm font-medium text-gray-700 mb-1">Contract Value ($)</label>
                   <input
                     type="number"
                     name="value"
+                    id="contract-value"
                     min="0"
                     defaultValue={editingContract?.value}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                  <label htmlFor="contract-start-date" className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                   <input
                     type="date"
                     name="startDate"
+                    id="contract-start-date"
                     required
                     defaultValue={editingContract?.startDate}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                  <label htmlFor="contract-end-date" className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
                   <input
                     type="date"
                     name="endDate"
+                    id="contract-end-date"
                     required
                     defaultValue={editingContract?.endDate}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
@@ -838,7 +871,7 @@ export default function ContractManagementPage() {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div 
-                          className={`h-2 rounded-full ${(selectedContract.riskScore || 0) >= 80 ? 'bg-green-500' : (selectedContract.riskScore || 0) >= 60 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                          className={`h-2 rounded-full ${getContractRiskBarColor(selectedContract.riskScore || 0)}`}
                           style={{ width: `${selectedContract.riskScore || 0}%` }}
                         ></div>
                       </div>
@@ -850,7 +883,7 @@ export default function ContractManagementPage() {
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div 
-                          className={`h-2 rounded-full ${(selectedContract.compliance || 0) >= 90 ? 'bg-green-500' : (selectedContract.compliance || 0) >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                          className={`h-2 rounded-full ${getComplianceBarColor(selectedContract.compliance || 0)}`}
                           style={{ width: `${selectedContract.compliance || 0}%` }}
                         ></div>
                       </div>

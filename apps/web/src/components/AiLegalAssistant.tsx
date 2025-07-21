@@ -19,6 +19,7 @@ interface Message {
   analysisType?: string;
   confidence?: number;
   metadata?: {
+    provider?: string;
     tokensUsed: number;
     processingTime: number;
   };
@@ -163,8 +164,9 @@ export default function AiLegalAssistant() {
         {/* Controls */}
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-2">
-            <label className="text-gray-600">Analysis Type:</label>
+            <label htmlFor="analysis-type" className="text-gray-600">Analysis Type:</label>
             <select 
+              id="analysis-type"
               value={analysisType} 
               onChange={(e) => setAnalysisType(e.target.value)}
               className="px-2 py-1 border rounded text-xs"
@@ -178,8 +180,9 @@ export default function AiLegalAssistant() {
           </div>
           
           <div className="flex items-center gap-2">
-            <label className="text-gray-600">Jurisdiction:</label>
+            <label htmlFor="jurisdiction" className="text-gray-600">Jurisdiction:</label>
             <Input
+              id="jurisdiction"
               type="text"
               placeholder="e.g., nigeria, uae"
               value={jurisdiction}
@@ -252,7 +255,7 @@ export default function AiLegalAssistant() {
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             placeholder="Ask me about legal matters, contracts, compliance, or any legal question..."
             className="flex-1"
             disabled={isLoading}

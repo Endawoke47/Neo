@@ -14,7 +14,7 @@ interface UseCommandPaletteProps {
 
 export function useCommandPalette({ onToggle, enabled = true }: UseCommandPaletteProps) {
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return undefined;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       // Cmd+K (Mac) or Ctrl+K (PC)

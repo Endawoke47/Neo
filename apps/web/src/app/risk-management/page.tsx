@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import MainLayout from '../../components/layout/MainLayout';
-import { Shield, Plus, Search, Download, Upload, Edit3, Trash2, Eye, AlertTriangle, TrendingUp, BarChart3, Target, Activity, ChevronDown, CheckCircle } from 'lucide-react';
+import { Shield, Plus, Search, Download, Upload, Edit3, Trash2, Eye, AlertTriangle, TrendingUp, BarChart3, Target, Activity, CheckCircle } from 'lucide-react';
 
 interface Risk {
   id: string;
@@ -224,6 +224,25 @@ export default function RiskManagementPage() {
     return 'text-green-600';
   };
 
+  const getRiskBarColor = (score: number) => {
+    if (score >= 80) return 'bg-red-500';
+    if (score >= 60) return 'bg-orange-500';
+    if (score >= 40) return 'bg-yellow-500';
+    return 'bg-green-500';
+  };
+
+  const getRiskDotColor = (score: number) => {
+    if (score >= 80) return 'bg-red-500';
+    if (score >= 60) return 'bg-orange-500';
+    return 'bg-green-500';
+  };
+
+  const getRiskLevelMessage = (score: number) => {
+    if (score >= 80) return 'Critical Risk Level';
+    if (score >= 60) return 'High Risk Level';
+    return 'Manageable Risk Level';
+  };
+
   // Filter risks based on search and filter
   const filteredRisks = risks.filter(risk => {
     const matchesSearch = risk.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -277,7 +296,7 @@ export default function RiskManagementPage() {
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat, index) => (
-            <div key={index} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
+            <div key={`risk-stat-${stat.label}-${index}`} className="bg-white rounded-lg p-6 shadow-sm border border-gray-200">
               <div className="flex items-center">
                 <div className={`p-3 rounded-lg ${stat.color} bg-opacity-10`}>
                   <stat.icon className={`w-6 h-6 ${stat.color}`} />
@@ -377,7 +396,7 @@ export default function RiskManagementPage() {
                       <div className="flex items-center">
                         <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                           <div 
-                            className={`h-2 rounded-full ${risk.riskScore >= 80 ? 'bg-red-500' : risk.riskScore >= 60 ? 'bg-orange-500' : risk.riskScore >= 40 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                            className={`h-2 rounded-full ${getRiskBarColor(risk.riskScore)}`}
                             style={{ width: `${risk.riskScore}%` }}
                           ></div>
                         </div>
@@ -437,8 +456,8 @@ export default function RiskManagementPage() {
               <button className="text-sm text-primary-600 hover:text-primary-800">View Details</button>
             </div>
             <div className="space-y-4">
-              {riskTrends.map((trend, index) => (
-                <div key={index} className="flex items-center justify-between">
+              {riskTrends.map((trend) => (
+                <div key={trend.month} className="flex items-center justify-between">
                   <div className="flex items-center space-x-4">
                     <span className="font-medium text-gray-900 w-8">{trend.month}</span>
                     <div className="flex space-x-2">
@@ -468,8 +487,8 @@ export default function RiskManagementPage() {
               <button className="text-sm text-primary-600 hover:text-primary-800">Export Report</button>
             </div>
             <div className="space-y-4">
-              {riskCategories.map((category, index) => (
-                <div key={index} className="space-y-2">
+              {riskCategories.map((category) => (
+                <div key={category.category} className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-gray-900">{category.category}</span>
                     <span className="text-sm text-gray-600">{category.count} risks ({category.percentage}%)</span>
@@ -524,19 +543,21 @@ export default function RiskManagementPage() {
             }}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Risk Title</label>
+                  <label htmlFor="risk-title" className="block text-sm font-medium text-gray-700 mb-1">Risk Title</label>
                   <input
                     type="text"
                     name="title"
+                    id="risk-title"
                     required
                     defaultValue={editingRisk?.title}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                  <label htmlFor="risk-category" className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                   <select
                     name="category"
+                    id="risk-category"
                     required
                     defaultValue={editingRisk?.category}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
@@ -551,19 +572,21 @@ export default function RiskManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                  <label htmlFor="risk-type" className="block text-sm font-medium text-gray-700 mb-1">Type</label>
                   <input
                     type="text"
                     name="type"
+                    id="risk-type"
                     required
                     defaultValue={editingRisk?.type}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Severity</label>
+                  <label htmlFor="risk-severity" className="block text-sm font-medium text-gray-700 mb-1">Severity</label>
                   <select
                     name="severity"
+                    id="risk-severity"
                     required
                     defaultValue={editingRisk?.severity}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
@@ -575,9 +598,10 @@ export default function RiskManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Probability</label>
+                  <label htmlFor="risk-probability" className="block text-sm font-medium text-gray-700 mb-1">Probability</label>
                   <select
                     name="probability"
+                    id="risk-probability"
                     required
                     defaultValue={editingRisk?.probability}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
@@ -589,9 +613,10 @@ export default function RiskManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Impact</label>
+                  <label htmlFor="risk-impact" className="block text-sm font-medium text-gray-700 mb-1">Impact</label>
                   <select
                     name="impact"
+                    id="risk-impact"
                     required
                     defaultValue={editingRisk?.impact}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
@@ -603,9 +628,10 @@ export default function RiskManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                  <label htmlFor="risk-status" className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                   <select
                     name="status"
+                    id="risk-status"
                     required
                     defaultValue={editingRisk?.status}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
@@ -618,48 +644,53 @@ export default function RiskManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Risk Owner</label>
+                  <label htmlFor="risk-owner" className="block text-sm font-medium text-gray-700 mb-1">Risk Owner</label>
                   <input
                     type="text"
                     name="owner"
+                    id="risk-owner"
                     required
                     defaultValue={editingRisk?.owner}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                  <label htmlFor="risk-department" className="block text-sm font-medium text-gray-700 mb-1">Department</label>
                   <input
                     type="text"
                     name="department"
+                    id="risk-department"
                     required
                     defaultValue={editingRisk?.department}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Identified Date</label>
+                  <label htmlFor="risk-identified-date" className="block text-sm font-medium text-gray-700 mb-1">Identified Date</label>
                   <input
                     type="date"
                     name="identifiedDate"
+                    id="risk-identified-date"
                     required
                     defaultValue={editingRisk?.identifiedDate}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Review Date</label>
+                  <label htmlFor="risk-review-date" className="block text-sm font-medium text-gray-700 mb-1">Review Date</label>
                   <input
                     type="date"
                     name="reviewDate"
+                    id="risk-review-date"
                     defaultValue={editingRisk?.reviewDate}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Residual Risk</label>
+                  <label htmlFor="risk-residual-risk" className="block text-sm font-medium text-gray-700 mb-1">Residual Risk</label>
                   <select
                     name="residualRisk"
+                    id="risk-residual-risk"
                     required
                     defaultValue={editingRisk?.residualRisk}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
@@ -671,10 +702,11 @@ export default function RiskManagementPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Risk Score (0-100)</label>
+                  <label htmlFor="risk-score" className="block text-sm font-medium text-gray-700 mb-1">Risk Score (0-100)</label>
                   <input
                     type="number"
                     name="riskScore"
+                    id="risk-score"
                     min="0"
                     max="100"
                     defaultValue={editingRisk?.riskScore}
@@ -682,9 +714,10 @@ export default function RiskManagementPage() {
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Mitigation Strategy</label>
+                  <label htmlFor="risk-mitigation-strategy" className="block text-sm font-medium text-gray-700 mb-1">Mitigation Strategy</label>
                   <textarea
                     name="mitigationStrategy"
+                    id="risk-mitigation-strategy"
                     rows={3}
                     defaultValue={editingRisk?.mitigationStrategy}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500"
@@ -824,9 +857,9 @@ export default function RiskManagementPage() {
                   <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Risk Indicators</h3>
                   <div className="mt-2 space-y-2">
                     <div className="flex items-center space-x-2">
-                      <div className={`w-3 h-3 rounded-full ${selectedRisk.riskScore >= 80 ? 'bg-red-500' : selectedRisk.riskScore >= 60 ? 'bg-orange-500' : 'bg-green-500'}`}></div>
+                      <div className={`w-3 h-3 rounded-full ${getRiskDotColor(selectedRisk.riskScore)}`}></div>
                       <span className="text-sm text-gray-600">
-                        {selectedRisk.riskScore >= 80 ? 'Critical Risk Level' : selectedRisk.riskScore >= 60 ? 'High Risk Level' : 'Manageable Risk Level'}
+                        {getRiskLevelMessage(selectedRisk.riskScore)}
                       </span>
                     </div>
                     <div className="flex items-center space-x-2">

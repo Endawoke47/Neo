@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Search, 
   Plus, 
@@ -16,7 +16,6 @@ import {
   Settings, 
   BarChart,
   Brain,
-  Upload,
   Download,
   Filter,
   Calendar,
@@ -56,8 +55,8 @@ enum CommandCategory {
 }
 
 interface CommandPaletteProps {
-  isOpen: boolean;
-  onClose: () => void;
+  readonly isOpen: boolean;
+  readonly onClose: () => void;
 }
 
 export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
@@ -357,10 +356,16 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       // If search term, sort by relevance
       if (search) {
         const searchLower = search.toLowerCase();
-        const aRelevance = a.title.toLowerCase().startsWith(searchLower) ? 2 : 
-                          a.title.toLowerCase().includes(searchLower) ? 1 : 0;
-        const bRelevance = b.title.toLowerCase().startsWith(searchLower) ? 2 : 
-                          b.title.toLowerCase().includes(searchLower) ? 1 : 0;
+        
+        const getRelevance = (title: string) => {
+          const lowerTitle = title.toLowerCase();
+          if (lowerTitle.startsWith(searchLower)) return 2;
+          if (lowerTitle.includes(searchLower)) return 1;
+          return 0;
+        };
+        
+        const aRelevance = getRelevance(a.title);
+        const bRelevance = getRelevance(b.title);
         return bRelevance - aRelevance;
       }
       
@@ -412,6 +417,8 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       document.addEventListener('keydown', handleEscape);
       return () => document.removeEventListener('keydown', handleEscape);
     }
+    
+    return undefined;
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -509,9 +516,9 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                         <div className="flex items-center gap-2">
                           {command.shortcut && (
                             <div className="flex gap-1">
-                              {command.shortcut.split(' ').map((key, i) => (
+                              {command.shortcut.split(' ').map((key) => (
                                 <kbd
-                                  key={i}
+                                  key={`${command.id}-${key}`}
                                   className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded border"
                                 >
                                   {key}
@@ -534,11 +541,14 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
                 <div className="flex items-center gap-4">
                   <span className="flex items-center gap-1">
                     <kbd className="px-1 py-0.5 bg-white rounded border">↑</kbd>
+                    {' '}
                     <kbd className="px-1 py-0.5 bg-white rounded border">↓</kbd>
+                    {' '}
                     to navigate
                   </span>
                   <span className="flex items-center gap-1">
                     <kbd className="px-1 py-0.5 bg-white rounded border">Enter</kbd>
+                    {' '}
                     to select
                   </span>
                 </div>
