@@ -25,19 +25,54 @@
     "db:reset": "prisma migrate reset"
   },
   "dependencies": {
+<<<<<<< HEAD
     "@prisma/client": "^5.6.0",
     "axios": "^1.10.0",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
+=======
+    "@anthropic-ai/sdk": "^0.24.3",
+    "@google-ai/generativelanguage": "^0.2.1",
+    "@prisma/client": "^5.22.0",
+    "@types/bcrypt": "^5.0.2",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.23",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^1.4.13",
+    "@types/node": "^20.10.5",
+    "@types/nodemailer": "^6.4.17",
+    "@types/swagger-ui-express": "^4.1.6",
+    "bcrypt": "^5.1.1",
+    "bcryptjs": "^2.4.3",
+>>>>>>> 86de1ee (🚀 Complete Performance Optimization - Production Ready)
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0",
+<<<<<<< HEAD
     "jsonwebtoken": "^9.0.2",
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^4.7.1",
     "zod": "^3.22.4"
+=======
+    "isomorphic-dompurify": "^2.15.0",
+    "swagger-jsdoc": "^6.2.8",
+    "joi": "^17.13.3",
+    "jsonwebtoken": "^9.0.2",
+    "@langchain/core": "^0.2.27",
+    "@langchain/openai": "^0.2.7",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^7.0.5",
+    "openai": "^4.57.0",
+    "pdf2pic": "^3.1.2",
+    "prisma": "^5.22.0",
+    "sharp": "^0.32.6",
+    "swagger-ui-express": "^5.0.1",
+    "winston": "^3.17.0",
+    "zod": "^3.25.76"
+>>>>>>> 86de1ee (🚀 Complete Performance Optimization - Production Ready)
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

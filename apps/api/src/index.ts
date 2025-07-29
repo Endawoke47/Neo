@@ -17,15 +17,65 @@ import { logger } from './config/logger';
 import { errorHandler } from './middleware/error.middleware';
 import { securityMiddleware } from './middleware/security.middleware';
 import { requestLogger } from './middleware/logger.middleware';
+<<<<<<< HEAD
 import authRoutes from './routes/auth.routes';
 import healthRoutes from './routes/health.routes';
+=======
+import { auditLogger } from './middleware/audit.middleware';
+import { swaggerSpec } from './config/swagger';
+
+// Import optimized global middleware
+import { 
+  globalRateLimit,
+  apiRateLimit,
+  securityHeaders,
+  compressionMiddleware,
+  requestLogger as globalRequestLogger,
+  corsOptions
+} from './middleware/global.middleware';
+
+// Routes
+import authRoutes from './routes/auth.routes';
+import userRoutes from './routes/user.routes';
+import contractRoutes from './routes/contracts-optimized.routes';
+import matterRoutes from './routes/matter.routes';
+import disputeRoutes from './routes/dispute.routes';
+import documentRoutes from './routes/document.routes';
+import clientRoutes from './routes/client.routes';
+import dashboardRoutes from './routes/dashboard.routes';
+import reportRoutes from './routes/report.routes';
+import aiRoutes from './routes/ai.routes';
+import legalResearchRoutes from './routes/legal-research.routes';
+import { contractIntelligenceRoutes } from './routes/contract-intelligence.routes';
+import legalIntelligenceRoutes from './routes/legal-intelligence.routes';
+import documentAutomationRoutes from './routes/document-automation.routes';
+
+// Setup global error handlers
+setupGlobalErrorHandlers();
+>>>>>>> 86de1ee (🚀 Complete Performance Optimization - Production Ready)
 
 const app = express();
 
+<<<<<<< HEAD
 // Trust proxy for production deployments
 if (isProduction) {
   app.set('trust proxy', 1);
 }
+=======
+// Trust proxy for accurate IP addresses behind load balancers
+app.set('trust proxy', 1);
+
+// Performance monitoring
+const serverStart = perfLogger.time('server_initialization');
+
+// Optimized middleware stack
+app.use(globalRateLimit);
+app.use(securityHeaders);
+app.use(cors(corsOptions));
+app.use(compressionMiddleware);
+app.use(globalRequestLogger);
+
+>>>>>>> 86de1ee (🚀 Complete Performance Optimization - Production Ready)
 
 // Security middleware
 app.use(helmet({
@@ -68,9 +118,22 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+<<<<<<< HEAD
 // Request logging
 if (env.ENABLE_REQUEST_LOGGING) {
   app.use(requestLogger as any);
+=======
+// Audit middleware only
+app.use(auditLogger());
+
+// Swagger UI setup - only in development or if explicitly enabled
+if (env.ENABLE_API_DOCS) {
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    explorer: true,
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'CounselFlow API Documentation'
+  }));
+>>>>>>> 86de1ee (🚀 Complete Performance Optimization - Production Ready)
 }
 
 // Security middleware

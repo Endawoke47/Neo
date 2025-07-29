@@ -1,11 +1,18 @@
+<<<<<<< HEAD
 // CounselFlow Neo - Optimized Schema for SQLite Development
+=======
+// Optimized Prisma Database Schema (PostgreSQL)
+// Optimized for production performance with indexes
+// Date: 2025-07-29
+>>>>>>> 86de1ee (🚀 Complete Performance Optimization - Production Ready)
 
 generator client {
   provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearch", "views"]
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -18,6 +25,7 @@ model User {
   password                    String
   phoneNumber                 String?
   
+<<<<<<< HEAD
   // Account Status
   role                        String    @default("USER")  // ADMIN, USER, GUEST
   status                      String    @default("ACTIVE") // ACTIVE, PENDING_VERIFICATION, SUSPENDED, DEACTIVATED
@@ -59,6 +67,15 @@ model User {
   @@index([createdAt])
   @@index([lastLoginAt])
   @@index([isEmailVerified])
+=======
+  // Indexes for performance
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+  @@index([createdAt])
+  @@index([firm])
+  @@fulltext([firstName, lastName])
+>>>>>>> 86de1ee (🚀 Complete Performance Optimization - Production Ready)
   @@map("users")
 }
 
@@ -74,6 +91,7 @@ model Session {
   
   user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   
+<<<<<<< HEAD
   // Performance Indexes
   @@index([userId])
   @@index([isActive])
@@ -81,6 +99,53 @@ model Session {
   @@index([createdAt])
   @@index([userId, isActive])
   @@map("sessions")
+=======
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+// Password reset tokens
+model PasswordReset {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_resets")
+}
+
+// Audit logging
+model AuditLog {
+  id             String   @id @default(cuid())
+  userId         String
+  action         String   // CREATE, READ, UPDATE, DELETE
+  resource       String   // contracts, matters, users, etc.
+  resourceId     String?
+  method         String   // HTTP method
+  path           String   // Request path
+  ipAddress      String
+  userAgent      String?
+  requestBody    String?  // JSON string
+  responseStatus Int
+  duration       Int?     // Response time in ms
+  metadata       String?  // Additional data as JSON
+  timestamp      DateTime @default(now())
+  
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([action])
+  @@index([resource])
+  @@index([timestamp])
+  @@index([ipAddress])
+  @@map("audit_logs")
+>>>>>>> 86de1ee (🚀 Complete Performance Optimization - Production Ready)
 }
 
 // Client Management
@@ -91,6 +156,7 @@ model Client {
   phoneNumber         String?
   address             String?
   
+<<<<<<< HEAD
   // Client Type and Industry
   clientType          String      @default("INDIVIDUAL") // INDIVIDUAL, CORPORATION, PARTNERSHIP, GOVERNMENT, NGO
   industry            String?
@@ -125,6 +191,58 @@ model Client {
   @@map("clients")
 }
 
+=======
+  // Relationships
+  assignedLawyer  User          @relation(fields: [assignedLawyerId], references: [id])
+  assignedLawyerId String
+  contracts       Contract[]
+  matters         Matter[]
+  disputes        Dispute[]
+  documents       Document[]
+
+  @@index([assignedLawyerId])
+  @@index([clientType])
+  @@index([isActive])
+  @@index([createdAt])
+  @@fulltext([name])
+  @@map("clients")
+}
+
+// Contract Management
+model Contract {
+  id                String          @id @default(cuid())
+  title             String
+  description       String?
+  type              String          // SERVICE_AGREEMENT, EMPLOYMENT, NDA, etc.
+  status            String          @default("DRAFT") // DRAFT, UNDER_REVIEW, ACTIVE, EXPIRED, TERMINATED
+  value             Float?
+  currency          String          @default("USD")
+  startDate         DateTime?
+  endDate           DateTime?
+  autoRenewal       Boolean         @default(false)
+  renewalPeriod     String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  // Relationships
+  client            Client          @relation(fields: [clientId], references: [id])
+  clientId          String
+  assignedLawyer    User            @relation(fields: [assignedLawyerId], references: [id])
+  assignedLawyerId  String
+  documents         Document[]
+  aiAnalyses        AIAnalysis[]
+
+  @@index([clientId])
+  @@index([assignedLawyerId])
+  @@index([status])
+  @@index([type])
+  @@index([createdAt])
+  @@index([endDate])
+  @@fulltext([title, description])
+  @@map("contracts")
+}
+
+>>>>>>> 86de1ee (🚀 Complete Performance Optimization - Production Ready)
 // Matter Management
 model Matter {
   id                String      @id @default(cuid())
@@ -164,6 +282,7 @@ model Matter {
   assignedLawyer    User?       @relation(fields: [assignedLawyerId], references: [id])
   contracts         Contract[]
   documents         Document[]
+<<<<<<< HEAD
   
   // Performance Indexes
   @@index([type])
@@ -234,10 +353,109 @@ model Contract {
   @@index([status, priority])
   @@index([clientId, status])
   @@map("contracts")
+=======
+  disputes          Dispute[]
+  riskAssessments   Risk[]
+  aiAnalyses        AIAnalysis[]
+
+  @@index([clientId])
+  @@index([assignedLawyerId])
+  @@index([status])
+  @@index([priority])
+  @@index([type])
+  @@index([createdAt])
+  @@index([statute_of_limitations])
+  @@fulltext([title, description])
+  @@map("matters")
+}
+
+// Dispute Management
+model Dispute {
+  id                  String          @id @default(cuid())
+  title               String
+  description         String?
+  type                String          // CONTRACT, TORT, EMPLOYMENT, etc.
+  status              String          @default("OPEN") // OPEN, IN_PROGRESS, MEDIATION, ARBITRATION, LITIGATION, SETTLED, CLOSED
+  priority            String          @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  riskLevel           String          @default("MEDIUM") // LOW, MEDIUM, HIGH
+  claimAmount         Float?
+  currency            String          @default("USD")
+  courtName           String?
+  caseNumber          String?
+  timeline            DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  // Relationships
+  matter              Matter?         @relation(fields: [matterId], references: [id])
+  matterId            String?
+  client              Client          @relation(fields: [clientId], references: [id])
+  clientId            String
+  assignedLawyer      User            @relation(fields: [assignedLawyerId], references: [id])
+  assignedLawyerId    String
+  documents           Document[]
+  riskAssessments     Risk[]
+  aiAnalyses          AIAnalysis[]
+
+  @@index([matterId])
+  @@index([clientId])
+  @@index([assignedLawyerId])
+  @@index([status])
+  @@index([priority])
+  @@index([type])
+  @@index([createdAt])
+  @@index([timeline])
+  @@fulltext([title, description])
+  @@map("disputes")
+>>>>>>> 86de1ee (🚀 Complete Performance Optimization - Production Ready)
 }
 
 // Document Management
 model Document {
+<<<<<<< HEAD
+=======
+  id                String          @id @default(cuid())
+  title             String
+  description       String?
+  type              String          // CONTRACT, LEGAL_BRIEF, CORRESPONDENCE, etc.
+  category          String?
+  filePath          String?
+  fileType          String?
+  fileSize          Int?
+  isConfidential    Boolean         @default(false)
+  tags              String?         // JSON array as string
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  // Relationships
+  uploadedBy        User            @relation(fields: [uploadedById], references: [id])
+  uploadedById      String
+  client            Client?         @relation(fields: [clientId], references: [id])
+  clientId          String?
+  contract          Contract?       @relation(fields: [contractId], references: [id])
+  contractId        String?
+  matter            Matter?         @relation(fields: [matterId], references: [id])
+  matterId          String?
+  dispute           Dispute?        @relation(fields: [disputeId], references: [id])
+  disputeId         String?
+  aiAnalyses        AIAnalysis[]
+
+  @@index([uploadedById])
+  @@index([clientId])
+  @@index([contractId])
+  @@index([matterId])
+  @@index([disputeId])
+  @@index([type])
+  @@index([category])
+  @@index([isConfidential])
+  @@index([createdAt])
+  @@fulltext([title, description])
+  @@map("documents")
+}
+
+// Risk Assessment
+model Risk {
+>>>>>>> 86de1ee (🚀 Complete Performance Optimization - Production Ready)
   id                String        @id @default(cuid())
   title             String
   description       String?
@@ -278,6 +496,7 @@ model Document {
   uploadedBy        User          @relation(fields: [uploadedById], references: [id])
   client            Client?       @relation(fields: [clientId], references: [id])
   matter            Matter?       @relation(fields: [matterId], references: [id])
+<<<<<<< HEAD
   contract          Contract?     @relation(fields: [contractId], references: [id])
   parentDocument    Document?     @relation("DocumentVersions", fields: [parentDocumentId], references: [id])
   childDocuments    Document[]    @relation("DocumentVersions")
@@ -336,3 +555,92 @@ model AuditLog {
   @@index([entityType, entityId])
   @@map("audit_logs")
 }
+=======
+  matterId          String?
+  dispute           Dispute?      @relation(fields: [disputeId], references: [id])
+  disputeId         String?
+
+  @@index([assessedById])
+  @@index([matterId])
+  @@index([disputeId])
+  @@index([category])
+  @@index([level])
+  @@index([riskScore])
+  @@index([createdAt])
+  @@index([reviewDate])
+  @@fulltext([title, description])
+  @@map("risks")
+}
+
+// Policy Management
+model Policy {
+  id              String        @id @default(cuid())
+  title           String
+  description     String?
+  category        String        // HR, LEGAL, COMPLIANCE, etc.
+  type            String        // PROCEDURE, GUIDELINE, STANDARD, etc.
+  status          String        @default("DRAFT") // DRAFT, UNDER_REVIEW, etc.
+  version         String        @default("1.0")
+  effectiveDate   DateTime?
+  reviewDate      DateTime?
+  expiryDate      DateTime?
+  approvalRequired Boolean      @default(true)
+  content         String        // Policy content
+  tags            String?       // JSON string of tags
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relationships
+  createdBy       User          @relation(fields: [createdById], references: [id])
+  createdById     String
+
+  @@index([createdById])
+  @@index([category])
+  @@index([status])
+  @@index([effectiveDate])
+  @@index([reviewDate])
+  @@index([createdAt])
+  @@fulltext([title, description, content])
+  @@map("policies")
+}
+
+// AI Analysis
+model AIAnalysis {
+  id              String          @id @default(cuid())
+  title           String
+  type            String          // CONTRACT_ANALYSIS, RISK_ASSESSMENT, etc.
+  status          String          @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  input           String?         // JSON string of input data
+  output          String?         // JSON string of analysis results
+  confidence      Int?            // 0 to 100
+  model           String?
+  processingTime  Int?            // in milliseconds
+  tokensUsed      Int?
+  cost            Float?
+  createdAt       DateTime        @default(now())
+  completedAt     DateTime?
+
+  // Relationships
+  requestedBy     User            @relation(fields: [requestedById], references: [id])
+  requestedById   String
+  contract        Contract?       @relation(fields: [contractId], references: [id])
+  contractId      String?
+  matter          Matter?         @relation(fields: [matterId], references: [id])
+  matterId        String?
+  dispute         Dispute?        @relation(fields: [disputeId], references: [id])
+  disputeId       String?
+  document        Document?       @relation(fields: [documentId], references: [id])
+  documentId      String?
+
+  @@index([requestedById])
+  @@index([contractId])
+  @@index([matterId])
+  @@index([disputeId])
+  @@index([documentId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@index([completedAt])
+  @@map("ai_analyses")
+}
+>>>>>>> 86de1ee (🚀 Complete Performance Optimization - Production Ready)

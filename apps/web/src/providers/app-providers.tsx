@@ -1,14 +1,9 @@
-// App Providers
-// User: Endawoke47
-// Date: 2025-07-11 20:46:45 UTC
-
 'use client';
 
 import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { AuthProvider } from './auth-provider';
 import { AIProvider } from './ai-provider';
+<<<<<<< HEAD
 import { CommandPaletteProvider } from './command-palette-provider';
 
 // Create a client
@@ -20,18 +15,25 @@ const queryClient = new QueryClient({
     },
   },
 });
+=======
+import QueryProvider from './query-provider';
+>>>>>>> 86de1ee (🚀 Complete Performance Optimization - Production Ready)
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
-    <QueryClientProvider client={queryClient}>
+    <QueryProvider>
       <AuthProvider>
         <AIProvider>
+<<<<<<< HEAD
           <CommandPaletteProvider>
             {children}
             <ReactQueryDevtools initialIsOpen={false} />
           </CommandPaletteProvider>
+=======
+          {children}
+>>>>>>> 86de1ee (🚀 Complete Performance Optimization - Production Ready)
         </AIProvider>
       </AuthProvider>
-    </QueryClientProvider>
+    </QueryProvider>
   );
 }
